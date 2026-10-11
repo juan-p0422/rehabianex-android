@@ -1,0 +1,31 @@
+*.iml
+.gradle
+/.kotlin
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+/.idea/deploymentTargetSelector.xml
+/.idea/deviceManager.xml
+.DS_Store
+/build
+**/build/
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+**/google-services.json
+
+# Local Codex/editor work products and generated review artifacts.
+/.agents/
+/.codex/
+/.codex-docx-work/
+/tmp/
+/tmp_*/
+
+# Local diagnostic output.
+*.hprof
+*.log
