@@ -428,11 +428,11 @@ private fun PrivacyModeCard(
     privacyActionState: FormSaveUiState,
     onSavePrivacy: (PrivacyFormInput) -> Unit,
 ) {
-    val options = listOf("Nombre visible", "Nickname", "Anónimo")
+    val options = listOf("Nombre visible", "Nickname", "Ocultar identidad")
     var mode by rememberSaveable(profile.fullName, profile.nickname, profile.isAnonymous) {
         mutableStateOf(
             when {
-                profile.isAnonymous -> "Anónimo"
+                profile.isAnonymous -> "Ocultar identidad"
                 !profile.nickname.isNullOrBlank() -> "Nickname"
                 else -> "Nombre visible"
             },
@@ -457,7 +457,7 @@ private fun PrivacyModeCard(
                         displayName = profile.registeredName
                     } else if (selected == "Nickname") {
                         displayName = profile.nickname ?: ""
-                    } else if (selected == "Anónimo") {
+                    } else if (selected == "Ocultar identidad") {
                         displayName = "Paciente anónimo"
                     }
                 }
@@ -481,8 +481,12 @@ private fun PrivacyModeCard(
             Spacer(Modifier.height(8.dp))
         } else {
             SoftCard {
-                Text("Modo anónimo", fontWeight = FontWeight.Bold)
-                Text("Tu perfil se mostrará como Paciente anónimo cuando sea posible.")
+                Text("Privacidad visual", fontWeight = FontWeight.Bold)
+                Text("Tu nombre se sustituirá por “Paciente anónimo” en las vistas compatibles.")
+                Text(
+                    "Tu cuenta y tus datos siguen vinculados a tu identidad técnica; esta opción no garantiza anonimato.",
+                    color = RehabianexColors.GrayText,
+                )
             }
             Spacer(Modifier.height(8.dp))
         }

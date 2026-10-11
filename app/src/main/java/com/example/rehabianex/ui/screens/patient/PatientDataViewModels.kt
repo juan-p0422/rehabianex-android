@@ -1138,7 +1138,7 @@ class PatientProfileViewModel(
     private companion object {
         const val PRIVACY_VISIBLE = "Nombre visible"
         const val PRIVACY_NICKNAME = "Nickname"
-        const val PRIVACY_ANONYMOUS = "Anónimo"
+        const val PRIVACY_ANONYMOUS = "Ocultar identidad"
     }
 }
 

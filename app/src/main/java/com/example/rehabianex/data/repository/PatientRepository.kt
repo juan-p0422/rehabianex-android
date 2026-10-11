@@ -267,8 +267,8 @@ class PatientRepository(
         val displayName = profile.resolvedPatientDisplayName(registeredName).cleanText()
             ?: ANONYMOUS_PATIENT_DISPLAY_NAME
         val privacyText = when {
-            profile.isAnonymous == true -> "Modo anónimo activo"
-            profile.privacyMode == true -> "Modo de privacidad activo"
+            profile.isAnonymous == true -> "Identidad oculta en vistas compatibles"
+            profile.privacyMode == true -> "Privacidad visual activa"
             !nickname.isNullOrBlank() -> "Nickname visible para tu cuenta"
             else -> "Nombre visible para tu cuenta"
         }
@@ -301,7 +301,7 @@ class PatientRepository(
     private fun cachedProfileData(entity: PatientProfileEntity): PatientProfileData {
         val displayName = entity.displayName.cleanText() ?: "Usuario RehabiAnex"
         val privacyText = when {
-            entity.isAnonymous -> "Modo anónimo activo"
+            entity.isAnonymous -> "Identidad oculta en vistas compatibles"
             !entity.nickname.isNullOrBlank() -> "Nickname visible para tu cuenta"
             else -> "Nombre visible para tu cuenta"
         }
@@ -871,6 +871,7 @@ class PatientRepository(
                 ),
             )
         }
+    }
     }
 
     suspend fun updateOwnProfile(
