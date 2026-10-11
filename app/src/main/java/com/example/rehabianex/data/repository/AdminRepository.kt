@@ -3,11 +3,11 @@ package com.example.rehabianex.data.repository
 import com.example.rehabianex.core.error.ErrorMapper
 import com.example.rehabianex.core.session.SessionInvalidationBus
 import com.example.rehabianex.core.session.SessionManager
-import com.example.rehabianex.core.session.UserSession
+import com.example.rehabianex.core.session.SessionRefreshCoordinator
+import com.example.rehabianex.core.session.SessionRefreshResult
 import com.example.rehabianex.data.model.AdminAuthorizeSupervisorRequest
 import com.example.rehabianex.data.model.AdminSupervisorDto
 import com.example.rehabianex.data.model.AdminSupervisorReasonRequest
-import com.example.rehabianex.data.model.RefreshRequest
 import com.example.rehabianex.data.local.NetworkStatusProvider
 import com.example.rehabianex.data.local.db.AdminDashboardSummaryDao
 import com.example.rehabianex.data.local.db.AdminDashboardSummaryEntity
@@ -46,6 +46,8 @@ class AdminRepository(
     private val dashboardSummaryDao: AdminDashboardSummaryDao? = null,
     private val networkStatusProvider: NetworkStatusProvider? = null,
     private val now: () -> Long = System::currentTimeMillis,
+    private val sessionRefreshCoordinator: SessionRefreshCoordinator? =
+        sessionManager?.let { SessionRefreshCoordinator(apiService, it) },
 ) {
     suspend fun cachedDashboard(): AdminDashboardCacheData? {
         val uid = sessionManager?.getUid()?.takeIf(String::isNotBlank) ?: return null
@@ -192,7 +194,7 @@ class AdminRepository(
         } catch (error: SessionRefreshException) {
             clearSnapshotsOnDenied(error.statusCode, ownerUid)
             AdminDataResult.Failure(
-                message = ErrorMapper.fromHttpCode(error.statusCode).message,
+                message = error.message ?: ErrorMapper.fromHttpCode(error.statusCode).message,
                 statusCode = error.statusCode,
             )
         } catch (error: Exception) {
@@ -275,18 +277,23 @@ class AdminRepository(
         request: suspend () -> Response<T>,
     ): Response<T> {
         val manager = sessionManager ?: return request()
+        val coordinator = sessionRefreshCoordinator ?: return request()
+        val rejectedIdToken = manager.getIdToken()
         val firstResponse = request()
         if (firstResponse.code() != 401) return firstResponse
 
-        try {
-            refreshSession(manager)
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: SessionRefreshException) {
-            if (error.invalidatesSession) {
-                invalidateSession(manager)
+        when (val refresh = coordinator.refreshAfterUnauthorized(rejectedIdToken)) {
+            SessionRefreshResult.Success -> Unit
+            is SessionRefreshResult.Failure -> {
+                if (refresh.invalidatesSession) {
+                    invalidateSession(manager)
+                }
+                throw SessionRefreshException(
+                    statusCode = refresh.statusCode,
+                    invalidatesSession = refresh.invalidatesSession,
+                    message = refresh.message,
+                )
             }
-            throw error
         }
 
         return request().also { response ->
@@ -294,36 +301,6 @@ class AdminRepository(
                 invalidateSession(manager)
             }
         }
-    }
-
-    private suspend fun refreshSession(manager: SessionManager) {
-        val refreshToken = manager.getRefreshToken()?.takeIf { it.isNotBlank() }
-            ?: throw SessionRefreshException(statusCode = 401, invalidatesSession = true)
-        val uid = manager.getUid()?.takeIf { it.isNotBlank() }
-            ?: throw SessionRefreshException(statusCode = 401, invalidatesSession = true)
-        val role = manager.getRole()?.takeIf { it == "admin" }
-            ?: throw SessionRefreshException(statusCode = 401, invalidatesSession = true)
-        val response = apiService.refresh(RefreshRequest(refreshToken))
-        if (!response.isSuccessful) {
-            throw SessionRefreshException(
-                statusCode = response.code(),
-                invalidatesSession = response.code() == 401,
-            )
-        }
-        val tokens = response.body()?.resolvedTokens()
-        val idToken = tokens?.idToken?.takeIf { it.isNotBlank() }
-            ?: throw SessionRefreshException()
-
-        manager.saveSession(
-            UserSession(
-                uid = uid,
-                email = manager.getEmail(),
-                role = role,
-                token = idToken,
-                refreshToken = tokens.refreshToken?.takeIf { it.isNotBlank() } ?: refreshToken,
-                displayName = manager.getDisplayName(),
-            ),
-        )
     }
 
     private fun invalidateSession(manager: SessionManager) {
@@ -341,7 +318,8 @@ class AdminRepository(
     private class SessionRefreshException(
         val statusCode: Int? = null,
         val invalidatesSession: Boolean = false,
-    ) : IOException()
+        message: String? = null,
+    ) : IOException(message)
 
     private fun String.validUid(): String? = trim()
         .takeIf {

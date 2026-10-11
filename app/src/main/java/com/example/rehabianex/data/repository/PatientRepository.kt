@@ -3,7 +3,8 @@ package com.example.rehabianex.data.repository
 import com.example.rehabianex.core.error.ErrorMapper
 import com.example.rehabianex.core.session.SessionManager
 import com.example.rehabianex.core.session.SessionInvalidationBus
-import com.example.rehabianex.core.session.UserSession
+import com.example.rehabianex.core.session.SessionRefreshCoordinator
+import com.example.rehabianex.core.session.SessionRefreshResult
 import com.example.rehabianex.data.local.PatientIdentityStorage
 import com.example.rehabianex.data.local.NetworkStatusProvider
 import com.example.rehabianex.data.local.db.CacheSyncStateEntity
@@ -43,7 +44,6 @@ import com.example.rehabianex.data.model.PatientNoteDto
 import com.example.rehabianex.data.model.PatientNotesResponse
 import com.example.rehabianex.data.model.PatientProfileData
 import com.example.rehabianex.data.model.PatientSupervisionState
-import com.example.rehabianex.data.model.RefreshRequest
 import com.example.rehabianex.data.model.ResourceListResponse
 import com.example.rehabianex.data.model.SaveNotificationSettingsRequest
 import com.example.rehabianex.data.model.SessionProfileDto
@@ -91,6 +91,8 @@ class PatientRepository(
     private val database: RehabiAnexDatabase? = null,
     private val networkStatusProvider: NetworkStatusProvider? = null,
     private val schedulePendingSync: ((String) -> Unit)? = null,
+    private val sessionRefreshCoordinator: SessionRefreshCoordinator =
+        SessionRefreshCoordinator(apiService, sessionManager),
 ) {
     suspend fun saveDailyNote(
         request: CreatePatientNoteRequest,
@@ -1625,20 +1627,25 @@ class PatientRepository(
     private suspend fun <T> authorizedCall(
         request: suspend () -> Response<T>,
     ): Response<T> {
+        val rejectedIdToken = sessionManager.getIdToken()
         val firstResponse = request()
         if (firstResponse.code() != 401) {
             return firstResponse
         }
 
-        try {
-            refreshSession()
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: EarlyFailureException) {
-            if (error.failure.statusCode == 401) {
-                invalidateSession()
+        when (val refresh = sessionRefreshCoordinator.refreshAfterUnauthorized(rejectedIdToken)) {
+            SessionRefreshResult.Success -> Unit
+            is SessionRefreshResult.Failure -> {
+                if (refresh.invalidatesSession) {
+                    invalidateSession()
+                }
+                throw EarlyFailureException(
+                    PatientDataResult.Failure(
+                        message = refresh.message,
+                        statusCode = refresh.statusCode,
+                    ),
+                )
             }
-            throw error
         }
 
         val retryResponse = request()
@@ -1652,55 +1659,6 @@ class PatientRepository(
             )
         }
         return retryResponse
-    }
-
-    private suspend fun refreshSession() {
-        val currentRefreshToken = sessionManager.getRefreshToken()
-            ?.takeIf { it.isNotBlank() }
-        val uid = sessionManager.getUid()
-            ?.takeIf { it.isNotBlank() }
-        val role = sessionManager.getRole()
-            ?.takeIf { it in VALID_ROLES }
-
-        if (currentRefreshToken == null || uid == null || role == null) {
-            throw EarlyFailureException(
-                PatientDataResult.Failure(
-                    message = "No hay una sesión válida. Inicia sesión nuevamente.",
-                    statusCode = 401,
-                ),
-            )
-        }
-
-        val response = apiService.refresh(RefreshRequest(currentRefreshToken))
-
-        if (!response.isSuccessful) {
-            throw EarlyFailureException(
-                PatientDataResult.Failure(
-                    message = response.refreshErrorMessage(),
-                    statusCode = response.code(),
-                ),
-            )
-        }
-
-        val tokens = response.body()?.resolvedTokens()
-        val idToken = tokens?.idToken?.takeIf { it.isNotBlank() }
-            ?: throw EarlyFailureException(
-                PatientDataResult.Failure(
-                    "El servidor no devolvió una sesión válida. Inténtalo nuevamente.",
-                ),
-            )
-        val refreshToken = tokens.refreshToken?.takeIf { it.isNotBlank() } ?: currentRefreshToken
-
-        sessionManager.saveSession(
-            UserSession(
-                uid = uid,
-                email = sessionManager.getEmail(),
-                role = role,
-                token = idToken,
-                refreshToken = refreshToken,
-                displayName = sessionManager.getDisplayName(),
-            ),
-        )
     }
 
     private suspend fun invalidateSession() {
@@ -1767,10 +1725,6 @@ class PatientRepository(
             statusCode = code(),
             fieldErrors = parsedError.fieldErrors,
         )
-    }
-
-    private fun Response<*>.refreshErrorMessage(): String {
-        return ErrorMapper.fromHttpCode(code()).message
     }
 
     private fun Response<*>.supervisionCancellationFallbackMessage(): String {

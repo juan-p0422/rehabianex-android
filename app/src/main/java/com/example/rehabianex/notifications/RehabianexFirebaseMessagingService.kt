@@ -21,6 +21,12 @@ class RehabianexFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
+        serviceScope.launch {
+            handleMessage(message)
+        }
+    }
+
+    private fun handleMessage(message: RemoteMessage) {
         val container = AppContainer(applicationContext)
         if (!container.sessionManager.hasActiveSession()) return
 

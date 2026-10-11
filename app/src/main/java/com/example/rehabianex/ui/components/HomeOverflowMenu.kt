@@ -42,43 +42,45 @@ fun HomeOverflowMenu(
         modifier = modifier.fillMaxWidth(),
         contentAlignment = Alignment.CenterEnd,
     ) {
-        Surface(
-            shape = CircleShape,
-            color = RehabianexColors.GreenVerySoft,
-            border = BorderStroke(1.dp, RehabianexColors.GreenSoft),
-            shadowElevation = 2.dp,
-        ) {
-            IconButton(
-                onClick = { expanded = true },
-                modifier = Modifier.size(40.dp),
+        Box {
+            Surface(
+                shape = CircleShape,
+                color = RehabianexColors.GreenVerySoft,
+                border = BorderStroke(1.dp, RehabianexColors.GreenSoft),
+                shadowElevation = 2.dp,
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_nav_more),
-                    contentDescription = "Opciones",
-                    tint = RehabianexColors.GreenDark,
-                )
+                IconButton(
+                    onClick = { expanded = true },
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_nav_more),
+                        contentDescription = "Opciones",
+                        tint = RehabianexColors.GreenDark,
+                    )
+                }
             }
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            containerColor = RehabianexColors.GrayCard,
-        ) {
-            items.forEach { item ->
-                DropdownMenuItem(
-                    text = { Text(item.label) },
-                    leadingIcon = {
-                        Icon(
-                            painter = painterResource(item.iconRes),
-                            contentDescription = null,
-                            tint = RehabianexColors.GreenDark,
-                        )
-                    },
-                    onClick = {
-                        expanded = false
-                        onNavigate(item.route)
-                    },
-                )
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                containerColor = RehabianexColors.GrayCard,
+            ) {
+                items.forEach { item ->
+                    DropdownMenuItem(
+                        text = { Text(item.label) },
+                        leadingIcon = {
+                            Icon(
+                                painter = painterResource(item.iconRes),
+                                contentDescription = null,
+                                tint = RehabianexColors.GreenDark,
+                            )
+                        },
+                        onClick = {
+                            expanded = false
+                            onNavigate(item.route)
+                        },
+                    )
+                }
             }
         }
     }

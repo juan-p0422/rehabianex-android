@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.rehabianex.core.network.ApiClient
 import com.example.rehabianex.core.session.SessionManager
 import com.example.rehabianex.core.session.OfflineDataCleanupCoordinator
+import com.example.rehabianex.core.session.SessionRefreshCoordinator
 import com.example.rehabianex.data.local.PatientIdentityStore
 import com.example.rehabianex.data.local.AndroidNetworkStatusProvider
 import com.example.rehabianex.data.local.SupervisorNotificationSettingsStore
@@ -25,6 +26,7 @@ class AppContainer(context: Context) {
     val sessionManager: SessionManager = secureSessionManager
 
     private val apiService: ApiService = ApiClient.createApiService(sessionManager)
+    private val sessionRefreshCoordinator = SessionRefreshCoordinator(apiService, sessionManager)
     val fcmDemoRepository = FcmDemoRepository(apiService)
     val fcmTokenManager = FcmTokenManager(applicationContext, apiService, sessionManager)
     private val database = RehabiAnexDatabase.getInstance(applicationContext)
@@ -37,6 +39,7 @@ class AppContainer(context: Context) {
         profileSnapshotDao = database.adminProfileSnapshotDao(),
         dashboardSummaryDao = database.adminDashboardSummaryDao(),
         networkStatusProvider = networkStatusProvider,
+        sessionRefreshCoordinator = sessionRefreshCoordinator,
     )
 
     val patientRepository = PatientRepository(
@@ -48,6 +51,7 @@ class AppContainer(context: Context) {
         schedulePendingSync = { ownerUid ->
             PatientSyncWorker.enqueue(applicationContext, ownerUid)
         },
+        sessionRefreshCoordinator = sessionRefreshCoordinator,
     )
 
     val supervisorRepository = SupervisorRepository(
@@ -56,6 +60,7 @@ class AppContainer(context: Context) {
         notificationSettingsStore = supervisorNotificationSettingsStore,
         profileSnapshotDao = database.supervisorProfileSnapshotDao(),
         dashboardSummaryDao = database.supervisorDashboardSummaryDao(),
+        sessionRefreshCoordinator = sessionRefreshCoordinator,
     )
 
     private val offlineDataCleanupCoordinator = OfflineDataCleanupCoordinator(

@@ -32,7 +32,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.rehabianex"
-        minSdk = 27
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"

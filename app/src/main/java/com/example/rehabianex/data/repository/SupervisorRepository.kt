@@ -3,7 +3,8 @@ package com.example.rehabianex.data.repository
 import com.example.rehabianex.core.error.ErrorMapper
 import com.example.rehabianex.core.session.SessionManager
 import com.example.rehabianex.core.session.SessionInvalidationBus
-import com.example.rehabianex.core.session.UserSession
+import com.example.rehabianex.core.session.SessionRefreshCoordinator
+import com.example.rehabianex.core.session.SessionRefreshResult
 import com.example.rehabianex.core.validation.MAX_AI_CHAT_QUESTION_LENGTH
 import com.example.rehabianex.core.validation.sanitizeAiChatQuestion
 import com.example.rehabianex.data.local.SupervisorNotificationSettingsStore
@@ -14,7 +15,6 @@ import com.example.rehabianex.data.local.db.SupervisorProfileSnapshotEntity
 import com.example.rehabianex.data.model.ConsentDto
 import com.example.rehabianex.data.model.NotificationSettingsData
 import com.example.rehabianex.data.model.PatientNoteDto
-import com.example.rehabianex.data.model.RefreshRequest
 import com.example.rehabianex.data.model.RespondSupervisionRequest
 import com.example.rehabianex.data.model.ResourceListResponse
 import com.example.rehabianex.data.model.SessionProfileDto
@@ -83,6 +83,8 @@ class SupervisorRepository(
     private val profileSnapshotDao: SupervisorProfileSnapshotDao? = null,
     private val dashboardSummaryDao: SupervisorDashboardSummaryDao? = null,
     private val now: () -> Long = System::currentTimeMillis,
+    private val sessionRefreshCoordinator: SessionRefreshCoordinator =
+        SessionRefreshCoordinator(apiService, sessionManager),
 ) {
     @Volatile
     private var chatEligibility: ChatEligibility? = null
@@ -846,20 +848,25 @@ class SupervisorRepository(
     private suspend fun <T> authorizedCall(
         request: suspend () -> Response<T>,
     ): Response<T> {
+        val rejectedIdToken = sessionManager.getIdToken()
         val firstResponse = request()
         if (firstResponse.code() != 401) {
             return firstResponse
         }
 
-        try {
-            refreshSession()
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: EarlyFailureException) {
-            if (error.failure.statusCode == 401) {
-                invalidateSession()
+        when (val refresh = sessionRefreshCoordinator.refreshAfterUnauthorized(rejectedIdToken)) {
+            SessionRefreshResult.Success -> Unit
+            is SessionRefreshResult.Failure -> {
+                if (refresh.invalidatesSession) {
+                    invalidateSession()
+                }
+                throw EarlyFailureException(
+                    SupervisorDataResult.Failure(
+                        message = refresh.message,
+                        statusCode = refresh.statusCode,
+                    ),
+                )
             }
-            throw error
         }
 
         val retryResponse = request()
@@ -873,52 +880,6 @@ class SupervisorRepository(
             )
         }
         return retryResponse
-    }
-
-    private suspend fun refreshSession() {
-        val currentRefreshToken = sessionManager.getRefreshToken()?.takeIf { it.isNotBlank() }
-        val uid = sessionManager.getUid()?.takeIf { it.isNotBlank() }
-        val role = sessionManager.getRole()?.takeIf { it in VALID_ROLES }
-
-        if (currentRefreshToken == null || uid == null || role == null) {
-            throw EarlyFailureException(
-                SupervisorDataResult.Failure(
-                    message = "No hay una sesión válida. Inicia sesión nuevamente.",
-                    statusCode = 401,
-                ),
-            )
-        }
-
-        val response = apiService.refresh(RefreshRequest(currentRefreshToken))
-
-        if (!response.isSuccessful) {
-            throw EarlyFailureException(
-                SupervisorDataResult.Failure(
-                    message = response.refreshErrorMessage(),
-                    statusCode = response.code(),
-                ),
-            )
-        }
-
-        val tokens = response.body()?.resolvedTokens()
-        val idToken = tokens?.idToken?.takeIf { it.isNotBlank() }
-            ?: throw EarlyFailureException(
-                SupervisorDataResult.Failure(
-                    "El servidor no devolvió una sesión válida. Inténtalo nuevamente.",
-                ),
-            )
-        val refreshToken = tokens.refreshToken?.takeIf { it.isNotBlank() } ?: currentRefreshToken
-
-        sessionManager.saveSession(
-            UserSession(
-                uid = uid,
-                email = sessionManager.getEmail(),
-                role = role,
-                token = idToken,
-                refreshToken = refreshToken,
-                displayName = sessionManager.getDisplayName(),
-            ),
-        )
     }
 
     private fun invalidateSession() {
@@ -980,10 +941,6 @@ class SupervisorRepository(
             in 500..599 -> "El asistente no está disponible temporalmente. Inténtalo más tarde."
             else -> "No fue posible consultar el Chat IA."
         }
-    }
-
-    private fun Response<*>.refreshErrorMessage(): String {
-        return ErrorMapper.fromHttpCode(code()).message
     }
 
     private fun SupervisorPatientDto.toPatientSummary(

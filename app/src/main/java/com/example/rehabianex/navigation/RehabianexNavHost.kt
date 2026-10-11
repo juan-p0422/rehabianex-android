@@ -9,9 +9,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -67,17 +76,26 @@ fun RehabianexNavHost(
     }
     val coroutineScope = rememberCoroutineScope()
     var pendingLogoutNotesCount by rememberSaveable { mutableStateOf<Int?>(null) }
-    val logout: () -> Unit = {
+    var logoutInProgress by rememberSaveable { mutableStateOf(false) }
+
+    fun beginLogout(confirmPendingNotesDeletion: Boolean) {
+        if (logoutInProgress) return
+        logoutInProgress = true
         coroutineScope.launch {
-            val result = authRepository.logout()
-            if (result.requiresPendingNotesConfirmation) {
-                pendingLogoutNotesCount = result.pendingNotesCount
-            } else {
-                authInfoMessage = result.message
-                navController.returnToLogin()
+            try {
+                val result = authRepository.logout(confirmPendingNotesDeletion)
+                if (result.requiresPendingNotesConfirmation) {
+                    pendingLogoutNotesCount = result.pendingNotesCount
+                } else {
+                    authInfoMessage = result.message
+                    navController.returnToLogin()
+                }
+            } finally {
+                logoutInProgress = false
             }
         }
     }
+    val logout: () -> Unit = { beginLogout(confirmPendingNotesDeletion = false) }
 
     LaunchedEffect(sessionManager, navController) {
         SessionInvalidationBus.events.collect { message ->
@@ -294,7 +312,9 @@ fun RehabianexNavHost(
 
     pendingLogoutNotesCount?.let { count ->
         AlertDialog(
-            onDismissRequest = { pendingLogoutNotesCount = null },
+            onDismissRequest = {
+                if (!logoutInProgress) pendingLogoutNotesCount = null
+            },
             title = { Text("Registros sin sincronizar") },
             text = {
                 Text(
@@ -311,21 +331,41 @@ fun RehabianexNavHost(
                 TextButton(
                     onClick = {
                         pendingLogoutNotesCount = null
-                        coroutineScope.launch {
-                            val result = authRepository.logout(confirmPendingNotesDeletion = true)
-                            authInfoMessage = result.message
-                            navController.returnToLogin()
-                        }
+                        beginLogout(confirmPendingNotesDeletion = true)
                     },
+                    enabled = !logoutInProgress,
                 ) {
                     Text("Cerrar sesión y eliminar")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingLogoutNotesCount = null }) {
+                TextButton(
+                    onClick = { pendingLogoutNotesCount = null },
+                    enabled = !logoutInProgress,
+                ) {
                     Text("Cancelar")
                 }
             },
+        )
+    }
+
+    if (logoutInProgress) {
+        AlertDialog(
+            onDismissRequest = {},
+            modifier = Modifier.semantics {
+                liveRegion = LiveRegionMode.Polite
+            },
+            title = { Text("Cerrando sesión") },
+            text = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CircularProgressIndicator()
+                    Text("Espera mientras protegemos y cerramos tu sesión.")
+                }
+            },
+            confirmButton = {},
         )
     }
 }
