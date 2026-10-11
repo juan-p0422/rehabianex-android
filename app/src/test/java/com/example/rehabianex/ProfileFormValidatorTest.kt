@@ -1,0 +1,95 @@
+package com.example.rehabianex
+
+import com.example.rehabianex.validation.EditableProfileFormInput
+import com.example.rehabianex.validation.PHONE_REGION_MEXICO
+import com.example.rehabianex.validation.ProfileFormValidator
+import com.example.rehabianex.validation.SUPERVISOR_TYPE_OTHER
+import com.example.rehabianex.validation.SUPERVISOR_TYPE_OPTIONS
+import com.example.rehabianex.validation.CONTACT_RELATIONSHIP_OPTIONS
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ProfileFormValidatorTest {
+    @Test
+    fun `form option codes match the backend contract`() {
+        assertTrue(SUPERVISOR_TYPE_OPTIONS.keys.containsAll(
+            listOf(
+                "doctor",
+                "psychiatrist",
+                "psychologist",
+                "clinical_psychologist",
+                "social_worker",
+                "support_sponsor",
+                "other",
+            ),
+        ))
+        assertFalse("therapist" in SUPERVISOR_TYPE_OPTIONS)
+        assertEquals(
+            setOf(
+                "family",
+                "partner",
+                "friend",
+                "health_professional",
+                "support_peer",
+                "work_or_school",
+                "other",
+            ),
+            CONTACT_RELATIONSHIP_OPTIONS.keys,
+        )
+    }
+
+    @Test
+    fun `patient profile keeps accents and normalizes mexico phone`() {
+        val result = ProfileFormValidator.validate(
+            EditableProfileFormInput(
+                fullName = "  María José de la O  ",
+                phone = "449 123 4567",
+                phoneRegion = PHONE_REGION_MEXICO,
+            ),
+            includeSupervisorType = false,
+        )
+
+        assertTrue(result.isValid)
+        assertEquals("María José de la O", result.value?.fullName)
+        assertEquals("+524491234567", result.value?.phone)
+    }
+
+    @Test
+    fun `other supervisor type uses separate bounded description`() {
+        val result = ProfileFormValidator.validate(
+            EditableProfileFormInput(
+                fullName = "Ana Gómez",
+                phone = "4491234567",
+                phoneRegion = PHONE_REGION_MEXICO,
+                supervisorType = SUPERVISOR_TYPE_OTHER,
+                supervisorTypeOther = "Terapeuta familiar",
+            ),
+            includeSupervisorType = true,
+        )
+
+        assertTrue(result.isValid)
+        assertEquals(SUPERVISOR_TYPE_OTHER, result.value?.supervisorType)
+        assertEquals("Terapeuta familiar", result.value?.supervisorTypeOther)
+    }
+
+    @Test
+    fun `invalid fields return specific messages`() {
+        val result = ProfileFormValidator.validate(
+            EditableProfileFormInput(
+                fullName = "<>",
+                phone = "123",
+                phoneRegion = PHONE_REGION_MEXICO,
+                supervisorType = SUPERVISOR_TYPE_OTHER,
+                supervisorTypeOther = " ",
+            ),
+            includeSupervisorType = true,
+        )
+
+        assertFalse(result.isValid)
+        assertTrue(result.fieldErrors.keys.containsAll(
+            listOf("fullName", "phone", "supervisorTypeOther"),
+        ))
+    }
+}

@@ -278,6 +278,7 @@ class PatientRepository(
             registeredName = registeredName,
             nickname = nickname,
             email = profile.email.cleanText() ?: "Sin correo registrado",
+            phone = profile.phone.cleanText() ?: "Sin teléfono registrado",
             supervisorText = supervisionState.description(supervisorName, consentActive),
             supervisorUid = supervisorUid,
             consentId = consent?.resourceId(),
@@ -310,6 +311,7 @@ class PatientRepository(
             registeredName = entity.fullName.cleanText() ?: displayName,
             nickname = entity.nickname.cleanText(),
             email = sessionManager.getEmail().cleanText() ?: "Sin correo registrado",
+            phone = "Se actualizará al conectar",
             supervisorText = "Actualizando el estado de supervisión…",
             supervisorUid = "",
             consentId = null,
@@ -870,6 +872,43 @@ class PatientRepository(
             )
         }
     }
+
+    suspend fun updateOwnProfile(
+        fullName: String,
+        phone: String,
+    ): PatientDataResult<String> {
+        if (networkStatusProvider?.isOnline() == false) {
+            return PatientDataResult.Failure(
+                "Necesitas conexión para editar nombre o teléfono. El cambio no se guardó en la cola.",
+            )
+        }
+        return safeRequest(
+            defaultUnexpectedMessage = "Ocurrió un error inesperado al actualizar el perfil.",
+        ) {
+            val patientUid = sessionUid()
+            val response = authorizedCall {
+                apiService.updatePatient(
+                    patientUid = patientUid,
+                    request = UpdatePatientRequest(
+                        fullName = fullName,
+                        phone = phone,
+                    ),
+                )
+            }
+            if (!response.isSuccessful) {
+                throw EarlyFailureException(response.toPatientFailure())
+            }
+
+            val profile = response.body()?.data ?: SessionProfileDto(
+                uid = patientUid,
+                role = "patient",
+                fullName = fullName,
+                phone = phone,
+                email = sessionManager.getEmail(),
+            )
+            cacheProfile(profile)
+            response.body()?.message.cleanText() ?: "Perfil actualizado correctamente."
+        }
     }
 
     /**

@@ -21,6 +21,8 @@ data class RegisterFormInput(
     val age: String,
     val supervisorType: String,
     val acceptedPrivacy: Boolean,
+    val phoneRegion: String = PHONE_REGION_MEXICO,
+    val supervisorTypeOther: String = "",
 )
 
 data class ValidationResult<T>(
@@ -62,11 +64,11 @@ object AuthValidator {
         input: RegisterFormInput,
     ): ValidationResult<RegisterRequest> {
         val errors = linkedMapOf<String, String>()
-        val fullName = input.fullName.trim().replace(MULTIPLE_SPACES_REGEX, " ")
+        val fullName = normalizeHumanName(input.fullName)
         val email = input.email.trim().lowercase(Locale.ROOT)
-        val phone = input.phone.filterNot(Char::isWhitespace)
+        val phone = PhoneNumberValidator.validate(input.phoneRegion, input.phone)
 
-        validateFullName(fullName)?.let { errors["fullName"] = it }
+        validateHumanName(fullName)?.let { errors["fullName"] = it }
         validateEmail(email)?.let { errors["email"] = it }
         validateStrongPassword(input.password)?.let { errors["password"] = it }
 
@@ -74,9 +76,7 @@ object AuthValidator {
             errors["passwordConfirmation"] = "Las contraseñas no coinciden."
         }
 
-        if (!PHONE_REGEX.matches(phone)) {
-            errors["phone"] = "Usa formato internacional, por ejemplo +524491234567."
-        }
+        phone.error?.let { errors["phone"] = it }
 
         if (input.role !in VALID_ROLES) {
             errors["role"] = "Selecciona un tipo de cuenta válido."
@@ -85,6 +85,7 @@ object AuthValidator {
         var gender: String? = null
         var age: Int? = null
         var supervisorType: String? = null
+        var supervisorTypeOther: String? = null
 
         if (input.role == ROLE_PATIENT) {
             gender = input.gender.takeIf { it in VALID_GENDERS }
@@ -99,10 +100,22 @@ object AuthValidator {
         }
 
         if (input.role == ROLE_SUPERVISOR) {
-            supervisorType = input.supervisorType.trim().lowercase(Locale.ROOT)
-            if (!SUPERVISOR_TYPE_REGEX.matches(supervisorType)) {
-                errors["supervisorType"] =
-                    "Usa un código válido, por ejemplo clinical_psychologist."
+            val selectedType = input.supervisorType.trim().lowercase(Locale.ROOT)
+            supervisorType = selectedType
+            if (selectedType == SUPERVISOR_TYPE_OTHER) {
+                supervisorTypeOther = input.supervisorTypeOther.trim().replace(Regex("\\s+"), " ")
+                    .takeIf { it.length in 1..80 && it.none(Char::isISOControl) }
+                    .also { custom ->
+                        if (custom == null) {
+                            errors["supervisorTypeOther"] =
+                                "Describe el tipo de supervisor con 1 a 80 caracteres."
+                        }
+                    }
+            } else {
+                if (selectedType !in SUPERVISOR_TYPE_CODES) {
+                    errors["supervisorType"] = "Selecciona un tipo de supervisor."
+                    supervisorType = null
+                }
             }
         }
 
@@ -117,10 +130,11 @@ object AuthValidator {
                     password = input.password,
                     fullName = fullName,
                     role = input.role,
-                    phone = phone,
+                    phone = checkNotNull(phone.value),
                     gender = gender,
                     age = age,
                     supervisorType = supervisorType,
+                    supervisorTypeOther = supervisorTypeOther,
                     privacyNoticeAccepted = true,
                     privacyNoticeVersion = PRIVACY_NOTICE_VERSION,
                 ),
@@ -134,15 +148,6 @@ object AuthValidator {
         email.isBlank() -> "Ingresa tu correo electrónico."
         email.length > MAX_EMAIL_LENGTH -> "El correo electrónico es demasiado largo."
         !EMAIL_REGEX.matches(email) -> "Ingresa un correo electrónico válido."
-        else -> null
-    }
-
-    private fun validateFullName(fullName: String): String? = when {
-        fullName.isBlank() -> "Ingresa tu nombre completo."
-        fullName.length !in MIN_NAME_LENGTH..MAX_NAME_LENGTH ->
-            "El nombre debe tener entre $MIN_NAME_LENGTH y $MAX_NAME_LENGTH caracteres."
-        !FULL_NAME_REGEX.matches(fullName) ->
-            "El nombre contiene caracteres no válidos."
         else -> null
     }
 
@@ -169,17 +174,10 @@ object AuthValidator {
         "^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$",
         RegexOption.IGNORE_CASE,
     )
-    private val FULL_NAME_REGEX = Regex("^[\\p{L}\\p{M}][\\p{L}\\p{M} .'-]*$")
-    private val PHONE_REGEX = Regex("^\\+[1-9]\\d{7,14}$")
-    private val SUPERVISOR_TYPE_REGEX = Regex("^[a-z][a-z0-9_]{2,49}$")
-    private val MULTIPLE_SPACES_REGEX = Regex("\\s+")
-
     private const val ROLE_PATIENT = "patient"
     private const val ROLE_SUPERVISOR = "supervisor"
     private val VALID_ROLES = setOf(ROLE_PATIENT, ROLE_SUPERVISOR)
     private val VALID_GENDERS = setOf("female", "male", "other")
-    private const val MIN_NAME_LENGTH = 2
-    private const val MAX_NAME_LENGTH = 100
     private const val MAX_EMAIL_LENGTH = 254
     private const val MIN_PASSWORD_LENGTH = 8
     private const val MAX_PASSWORD_LENGTH = 128

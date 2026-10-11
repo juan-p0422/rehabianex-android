@@ -22,6 +22,12 @@ import com.example.rehabianex.data.model.SupportContact
 import com.example.rehabianex.data.model.SupervisorCodePreview
 import com.example.rehabianex.data.repository.PatientDataResult
 import com.example.rehabianex.data.repository.PatientRepository
+import com.example.rehabianex.validation.EditableProfileFormInput
+import com.example.rehabianex.validation.PHONE_REGION_MEXICO
+import com.example.rehabianex.validation.PhoneNumberValidator
+import com.example.rehabianex.validation.ProfileFormValidator
+import com.example.rehabianex.validation.CONTACT_RELATIONSHIP_OPTIONS
+import com.example.rehabianex.validation.CONTACT_RELATIONSHIP_OTHER
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -62,6 +68,9 @@ data class SupportContactFormInput(
     val priority: String,
     val canReceiveAlerts: Boolean,
     val notes: String,
+    val phoneRegion: String = PHONE_REGION_MEXICO,
+    val relationshipCategory: String = CONTACT_RELATIONSHIP_OTHER,
+    val relationshipOther: String = "",
 )
 
 data class PrivacyFormInput(
@@ -532,7 +541,7 @@ class SupportNetworkViewModel(
     private fun SupportContactFormInput.toRequestOrError(): CreateSupportContactRequest? {
         val cleanName = name.cleanFormText(maxLength = 80)
         val cleanRelationship = relationship.cleanFormText(maxLength = 60)
-        val normalizedPhone = phone.normalizedPhone()
+        val validatedPhone = PhoneNumberValidator.validate(phoneRegion, phone)
         val priorityValue = priority.toIntOrNull()?.takeIf { it in 1..5 }
         val cleanNotes = notes.cleanFormText(maxLength = 180)
         val errors = buildMap {
@@ -542,9 +551,16 @@ class SupportNetworkViewModel(
             if (cleanRelationship == null || !cleanRelationship.isHumanLabel(minLength = 2, maxLength = 60)) {
                 put("relationship", "Indica una relación válida.")
             }
-            if (normalizedPhone == null) {
-                put("phone", "Usa un teléfono válido de 10 a 15 dígitos.")
+            if (relationshipCategory !in CONTACT_RELATIONSHIP_OPTIONS.keys) {
+                put("relationship", "Selecciona una categoría de relación válida.")
             }
+            if (
+                relationshipCategory == CONTACT_RELATIONSHIP_OTHER &&
+                relationshipOther.cleanFormText(maxLength = 60) == null
+            ) {
+                put("relationship", "Describe la relación con el contacto.")
+            }
+            validatedPhone.error?.let { put("phone", it) }
             if (priorityValue == null) {
                 put("priority", "Selecciona una prioridad válida.")
             }
@@ -561,10 +577,13 @@ class SupportNetworkViewModel(
         return CreateSupportContactRequest(
             name = cleanName!!,
             relationship = cleanRelationship!!,
-            phone = normalizedPhone!!,
+            phone = checkNotNull(validatedPhone.value),
             priority = priorityValue!!,
             canReceiveAlerts = canReceiveAlerts,
             notes = cleanNotes,
+            relationshipCategory = relationshipCategory,
+            relationshipOther = relationshipOther.cleanFormText(maxLength = 60)
+                .takeIf { relationshipCategory == CONTACT_RELATIONSHIP_OTHER },
         )
     }
 
@@ -911,6 +930,8 @@ class PatientProfileViewModel(
     val consentActionState: StateFlow<FormSaveUiState> = _consentActionState.asStateFlow()
     private val _privacyActionState = MutableStateFlow<FormSaveUiState>(FormSaveUiState.Idle)
     val privacyActionState: StateFlow<FormSaveUiState> = _privacyActionState.asStateFlow()
+    private val _profileActionState = MutableStateFlow<FormSaveUiState>(FormSaveUiState.Idle)
+    val profileActionState: StateFlow<FormSaveUiState> = _profileActionState.asStateFlow()
     private val refreshController = patientRefreshController()
 
     init {
@@ -1064,6 +1085,43 @@ class PatientProfileViewModel(
     fun clearPrivacyMessage() {
         if (_privacyActionState.value !is FormSaveUiState.Loading) {
             _privacyActionState.value = FormSaveUiState.Idle
+        }
+    }
+
+    fun saveProfile(input: EditableProfileFormInput) {
+        if (_profileActionState.value is FormSaveUiState.Loading) return
+
+        val validation = ProfileFormValidator.validate(
+            input = input,
+            includeSupervisorType = false,
+        )
+        val profile = validation.value
+        if (profile == null) {
+            _profileActionState.value = FormSaveUiState.Error(
+                message = "Revisa los datos del perfil.",
+                fieldErrors = validation.fieldErrors,
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _profileActionState.value = FormSaveUiState.Loading
+            _profileActionState.value = when (
+                val result = repository.updateOwnProfile(profile.fullName, profile.phone)
+            ) {
+                is PatientDataResult.Success -> {
+                    invalidatePatientRefreshes()
+                    refreshIfStale(force = true)
+                    FormSaveUiState.Success(result.data)
+                }
+                is PatientDataResult.Failure -> profileActionFailure(result)
+            }
+        }
+    }
+
+    fun clearProfileMessage() {
+        if (_profileActionState.value !is FormSaveUiState.Loading) {
+            _profileActionState.value = FormSaveUiState.Idle
         }
     }
 
@@ -1258,15 +1316,6 @@ private fun String.isSafeDisplayName(): Boolean {
             char == '-' ||
             char == '_'
     }
-}
-
-private fun String.normalizedPhone(): String? {
-    val trimmed = trim()
-    val hasPlus = trimmed.startsWith("+")
-    val digits = trimmed.filter { it.isDigit() }
-    if (digits.length !in 10..15) return null
-
-    return if (hasPlus) "+$digits" else digits
 }
 
 private fun String.toLocalDateOrNull(): LocalDate? {

@@ -20,8 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.rehabianex.data.model.SupportContact
 import com.example.rehabianex.navigation.Routes
@@ -31,6 +29,7 @@ import com.example.rehabianex.ui.components.ChipSelector
 import com.example.rehabianex.ui.components.DangerCard
 import com.example.rehabianex.ui.components.InputField
 import com.example.rehabianex.ui.components.OfflineStatusCard
+import com.example.rehabianex.ui.components.PhoneNumberField
 import com.example.rehabianex.ui.components.PatientScreenScaffold
 import com.example.rehabianex.ui.components.RehabianexButton
 import com.example.rehabianex.ui.components.RehabianexCard
@@ -41,6 +40,9 @@ import com.example.rehabianex.ui.components.ScreenHeader
 import com.example.rehabianex.ui.components.SoftCard
 import com.example.rehabianex.ui.components.TextAreaField
 import com.example.rehabianex.ui.theme.RehabianexColors
+import com.example.rehabianex.validation.PhoneNumberValidator
+import com.example.rehabianex.validation.CONTACT_RELATIONSHIP_OPTIONS
+import com.example.rehabianex.validation.CONTACT_RELATIONSHIP_OTHER
 
 @Composable
 fun SupportNetworkScreen(
@@ -169,19 +171,22 @@ private fun SupportContactForm(
     onSaveContact: (SupportContactFormInput) -> Unit,
     onInputChanged: () -> Unit,
 ) {
-    val relationshipOptions = listOf("Padrino", "Familia", "Hermano", "Hermana", "Amigo", "Doctor", "Otro")
     val initialRelationship = initialContact?.relationship.orEmpty()
-    val initialRelationshipOption = initialRelationship
-        .takeIf { it in relationshipOptions }
-        ?: if (initialContact == null) "Padrino" else "Otro"
+    val initialRelationshipOption = CONTACT_RELATIONSHIP_OPTIONS.entries
+        .firstOrNull { (_, label) -> label.equals(initialRelationship, ignoreCase = true) }
+        ?.key
+        ?: initialRelationship.takeIf { it in CONTACT_RELATIONSHIP_OPTIONS.keys }
+        ?: if (initialContact == null) "family" else CONTACT_RELATIONSHIP_OTHER
+    val initialPhone = PhoneNumberValidator.parseStored(initialContact?.phone)
     var name by rememberSaveable(initialContact?.id) { mutableStateOf(initialContact?.name.orEmpty()) }
     var relationship by rememberSaveable(initialContact?.id) { mutableStateOf(initialRelationshipOption) }
     var customRelationship by rememberSaveable(initialContact?.id) {
         mutableStateOf(
-            if (initialRelationshipOption == "Otro") initialRelationship else "",
+            if (initialRelationshipOption == CONTACT_RELATIONSHIP_OTHER) initialRelationship else "",
         )
     }
-    var phone by rememberSaveable(initialContact?.id) { mutableStateOf(initialContact?.phone.orEmpty()) }
+    var phone by rememberSaveable(initialContact?.id) { mutableStateOf(initialPhone.number) }
+    var phoneRegion by rememberSaveable(initialContact?.id) { mutableStateOf(initialPhone.region) }
     var priority by rememberSaveable(initialContact?.id) {
         mutableStateOf(initialContact?.priority?.coerceIn(1, 5)?.toString() ?: "1")
     }
@@ -216,18 +221,20 @@ private fun SupportContactForm(
         Text("Relación", fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
         ChipSelector(
-            options = relationshipOptions,
-            selected = relationship,
-            onSelected = { selected ->
+            options = CONTACT_RELATIONSHIP_OPTIONS.values.toList(),
+            selected = CONTACT_RELATIONSHIP_OPTIONS[relationship] ?: "Otro",
+            onSelected = { selectedLabel ->
                 update {
-                    relationship = selected
-                    if (selected != "Otro") {
+                    relationship = CONTACT_RELATIONSHIP_OPTIONS.entries
+                        .first { it.value == selectedLabel }
+                        .key
+                    if (relationship != CONTACT_RELATIONSHIP_OTHER) {
                         customRelationship = ""
                     }
                 }
             },
         )
-        if (relationship == "Otro") {
+        if (relationship == CONTACT_RELATIONSHIP_OTHER) {
             Spacer(Modifier.height(8.dp))
             InputField(
                 value = customRelationship,
@@ -243,13 +250,19 @@ private fun SupportContactForm(
             }
         }
         Spacer(Modifier.height(8.dp))
-        InputField(
+        PhoneNumberField(
             value = phone,
-            onValueChange = { value -> update { phone = value.take(18) } },
-            label = "Teléfono (+52...)",
+            region = phoneRegion,
+            onValueChange = { value -> update { phone = value } },
+            onRegionChange = { selected ->
+                update {
+                    phoneRegion = selected
+                    phone = ""
+                }
+            },
             enabled = !isSaving,
+            allowLegacyInternational = true,
             errorMessage = fieldErrors["phone"],
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
         )
         Spacer(Modifier.height(8.dp))
         Text("Prioridad", fontWeight = FontWeight.Bold)
@@ -291,10 +304,10 @@ private fun SupportContactForm(
             },
             enabled = !isSaving,
         ) {
-            val relationshipToSave = if (relationship == "Otro") {
+            val relationshipToSave = if (relationship == CONTACT_RELATIONSHIP_OTHER) {
                 customRelationship
             } else {
-                relationship
+                checkNotNull(CONTACT_RELATIONSHIP_OPTIONS[relationship])
             }
             onSaveContact(
                 SupportContactFormInput(
@@ -302,6 +315,9 @@ private fun SupportContactForm(
                     name = name,
                     relationship = relationshipToSave,
                     phone = phone,
+                    phoneRegion = phoneRegion,
+                    relationshipCategory = relationship,
+                    relationshipOther = customRelationship,
                     priority = priority,
                     canReceiveAlerts = canReceiveAlerts,
                     notes = notes,

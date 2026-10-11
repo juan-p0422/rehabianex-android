@@ -42,6 +42,7 @@ import com.example.rehabianex.data.model.UpdateAgendaEventRequest
 import com.example.rehabianex.data.model.UpdateConsentRequest
 import com.example.rehabianex.data.model.UpdatePatientRequest
 import com.example.rehabianex.data.model.UpdateSupervisionRequest
+import com.example.rehabianex.data.model.UpdateSupervisorRequest
 import com.example.rehabianex.data.model.UnlinkSupervisionResponse
 import retrofit2.Response
 import retrofit2.http.Body
@@ -136,6 +137,12 @@ interface ApiService {
     suspend fun updatePatient(
         @Path("patient_uid") patientUid: String,
         @Body request: UpdatePatientRequest,
+    ): Response<MutationResponse<SessionProfileDto>>
+
+    @PATCH("supervisors/{supervisor_uid}")
+    suspend fun updateSupervisor(
+        @Path("supervisor_uid") supervisorUid: String,
+        @Body request: UpdateSupervisorRequest,
     ): Response<MutationResponse<SessionProfileDto>>
 
     @GET("patients/{patient_uid}")

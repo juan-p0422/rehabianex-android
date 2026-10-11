@@ -18,6 +18,8 @@ data class RegisterRequest(
     val age: Int? = null,
     @SerializedName("supervisor_type")
     val supervisorType: String? = null,
+    @SerializedName("supervisor_type_other")
+    val supervisorTypeOther: String? = null,
     @SerializedName("privacy_notice_accepted")
     val privacyNoticeAccepted: Boolean,
     @SerializedName("privacy_notice_version")

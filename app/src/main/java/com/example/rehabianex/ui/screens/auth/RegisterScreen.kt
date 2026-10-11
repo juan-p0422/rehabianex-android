@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.example.rehabianex.ui.components.ChipSelector
 import com.example.rehabianex.ui.components.DangerCard
 import com.example.rehabianex.ui.components.InputField
+import com.example.rehabianex.ui.components.PhoneNumberField
 import com.example.rehabianex.ui.components.RehabianexButton
 import com.example.rehabianex.ui.components.ScreenScaffold
 import com.example.rehabianex.ui.components.SoftCard
@@ -29,6 +30,9 @@ import com.example.rehabianex.ui.components.WarningCard
 import com.example.rehabianex.ui.theme.RehabianexColors
 import com.example.rehabianex.data.model.PRIVACY_NOTICE_VERSION
 import com.example.rehabianex.validation.RegisterFormInput
+import com.example.rehabianex.validation.PHONE_REGION_MEXICO
+import com.example.rehabianex.validation.SUPERVISOR_TYPE_OPTIONS
+import com.example.rehabianex.validation.SUPERVISOR_TYPE_OTHER
 
 @Composable
 fun RegisterScreen(
@@ -42,11 +46,13 @@ fun RegisterScreen(
     var passwordConfirmation by rememberSaveable { mutableStateOf("") }
     var role by rememberSaveable { mutableStateOf("patient") }
     var phone by rememberSaveable { mutableStateOf("") }
+    var phoneRegion by rememberSaveable { mutableStateOf(PHONE_REGION_MEXICO) }
     var gender by rememberSaveable { mutableStateOf("") }
     var age by rememberSaveable { mutableStateOf("") }
     var supervisorType by rememberSaveable {
         mutableStateOf("clinical_psychologist")
     }
+    var supervisorTypeOther by rememberSaveable { mutableStateOf("") }
     var acceptedPrivacy by rememberSaveable { mutableStateOf(false) }
     val fieldErrors = (uiState as? AuthUiState.Error)?.fieldErrors.orEmpty()
     val isLoading = uiState is AuthUiState.Loading
@@ -85,16 +91,20 @@ fun RegisterScreen(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
         )
         Spacer(Modifier.height(9.dp))
-        InputField(
+        PhoneNumberField(
             value = phone,
+            region = phoneRegion,
             onValueChange = {
-                phone = it.take(20)
+                phone = it
                 onInputChanged()
             },
-            label = "Teléfono (+524491234567)",
+            onRegionChange = {
+                phoneRegion = it
+                phone = ""
+                onInputChanged()
+            },
             errorMessage = fieldErrors["phone"],
             enabled = !isLoading,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
         )
         Spacer(Modifier.height(9.dp))
         InputField(
@@ -195,16 +205,32 @@ fun RegisterScreen(
                     fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.height(6.dp))
-                InputField(
-                    value = supervisorType,
-                    onValueChange = {
-                        supervisorType = it.take(50)
+                ChipSelector(
+                    options = SUPERVISOR_TYPE_OPTIONS.values.toList(),
+                    selected = SUPERVISOR_TYPE_OPTIONS[supervisorType] ?: "Otro",
+                    onSelected = { label ->
+                        supervisorType = SUPERVISOR_TYPE_OPTIONS.entries
+                            .first { it.value == label }
+                            .key
                         onInputChanged()
                     },
-                    label = "Tipo de supervisor",
-                    errorMessage = fieldErrors["supervisorType"],
-                    enabled = !isLoading,
                 )
+                fieldErrors["supervisorType"]?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error)
+                }
+                if (supervisorType == SUPERVISOR_TYPE_OTHER) {
+                    Spacer(Modifier.height(6.dp))
+                    InputField(
+                        value = supervisorTypeOther,
+                        onValueChange = {
+                            supervisorTypeOther = it.take(80)
+                            onInputChanged()
+                        },
+                        label = "Describe el tipo de supervisor",
+                        errorMessage = fieldErrors["supervisorTypeOther"],
+                        enabled = !isLoading,
+                    )
+                }
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -270,6 +296,8 @@ fun RegisterScreen(
                         age = age,
                         supervisorType = supervisorType,
                         acceptedPrivacy = acceptedPrivacy,
+                        phoneRegion = phoneRegion,
+                        supervisorTypeOther = supervisorTypeOther,
                     ),
                 )
             },

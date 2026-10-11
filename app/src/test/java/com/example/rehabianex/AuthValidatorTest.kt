@@ -85,7 +85,7 @@ class AuthValidatorTest {
         val result = AuthValidator.validateRegister(
             validPatient().copy(
                 passwordConfirmation = "OtraClave123!",
-                phone = "449-123-4567",
+                phone = "449-123-456",
             ),
         )
 

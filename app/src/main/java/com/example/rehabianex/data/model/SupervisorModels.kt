@@ -222,6 +222,8 @@ data class SupervisorProfileData(
     val isRefreshing: Boolean = false,
     val lastSyncedAt: Long? = null,
     val refreshMessage: String? = null,
+    val supervisorTypeCode: String? = null,
+    val supervisorTypeOther: String? = null,
 )
 
 data class SupervisorChatData(

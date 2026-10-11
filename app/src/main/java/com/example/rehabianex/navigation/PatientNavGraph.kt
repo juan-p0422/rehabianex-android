@@ -206,6 +206,7 @@ internal fun NavGraphBuilder.patientGraph(
         val uiState = viewModel.uiState.collectAsStateWithLifecycle()
         val consentActionState = viewModel.consentActionState.collectAsStateWithLifecycle()
         val privacyActionState = viewModel.privacyActionState.collectAsStateWithLifecycle()
+        val profileActionState = viewModel.profileActionState.collectAsStateWithLifecycle()
         LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
             viewModel.refreshIfStale()
         }
@@ -215,6 +216,7 @@ internal fun NavGraphBuilder.patientGraph(
             uiState = uiState.value,
             consentActionState = consentActionState.value,
             privacyActionState = privacyActionState.value,
+            profileActionState = profileActionState.value,
             onRetry = viewModel::load,
                 onSetConsent = viewModel::setConsent,
                 onRevokeConsent = viewModel::revokeConsent,
@@ -222,6 +224,8 @@ internal fun NavGraphBuilder.patientGraph(
             onClearConsentMessage = viewModel::clearConsentMessage,
             onSavePrivacy = viewModel::savePrivacy,
             onClearPrivacyMessage = viewModel::clearPrivacyMessage,
+            onSaveProfile = viewModel::saveProfile,
+            onClearProfileMessage = viewModel::clearProfileMessage,
         )
     }
 }

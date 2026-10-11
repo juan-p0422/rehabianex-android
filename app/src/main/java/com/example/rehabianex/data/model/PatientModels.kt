@@ -27,6 +27,8 @@ data class SessionProfileDto(
     val verified: Boolean? = null,
     @SerializedName("supervisor_type")
     val supervisorType: String? = null,
+    @SerializedName("supervisor_type_other")
+    val supervisorTypeOther: String? = null,
     @SerializedName("supervisor_code")
     val supervisorCode: String? = null,
     @SerializedName("primary_risks")
@@ -147,6 +149,16 @@ data class UpdatePatientRequest(
     val privacyMode: Boolean? = null,
     @SerializedName("primary_risks")
     val primaryRisks: List<String>? = null,
+)
+
+data class UpdateSupervisorRequest(
+    @SerializedName("full_name")
+    val fullName: String,
+    val phone: String,
+    @SerializedName("supervisor_type")
+    val supervisorType: String,
+    @SerializedName("supervisor_type_other")
+    val supervisorTypeOther: String? = null,
 )
 
 data class MutationResponse<T>(
@@ -382,6 +394,10 @@ data class SupportContactDto(
     val patientUid: String? = null,
     val name: String? = null,
     val relationship: String? = null,
+    @SerializedName("relationship_category")
+    val relationshipCategory: String? = null,
+    @SerializedName("relationship_other")
+    val relationshipOther: String? = null,
     val phone: String? = null,
     val priority: Int? = null,
     @SerializedName("can_receive_alerts")
@@ -403,6 +419,10 @@ data class CreateSupportContactRequest(
     @SerializedName("can_receive_alerts")
     val canReceiveAlerts: Boolean,
     val notes: String? = null,
+    @SerializedName("relationship_category")
+    val relationshipCategory: String = "other",
+    @SerializedName("relationship_other")
+    val relationshipOther: String? = null,
 )
 
 data class AgendaEventDto(
@@ -583,6 +603,7 @@ data class PatientProfileData(
     val registeredName: String,
     val nickname: String?,
     val email: String,
+    val phone: String,
     val supervisorText: String,
     val supervisorUid: String,
     val consentId: String?,

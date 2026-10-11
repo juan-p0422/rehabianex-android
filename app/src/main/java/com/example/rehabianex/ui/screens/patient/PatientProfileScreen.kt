@@ -26,6 +26,7 @@ import com.example.rehabianex.ui.components.ChipSelector
 import com.example.rehabianex.ui.components.DangerCard
 import com.example.rehabianex.ui.components.InputField
 import com.example.rehabianex.ui.components.PatientScreenScaffold
+import com.example.rehabianex.ui.components.PhoneNumberField
 import com.example.rehabianex.ui.components.RehabianexButton
 import com.example.rehabianex.ui.components.RehabianexCard
 import com.example.rehabianex.ui.components.RehabianexDangerButton
@@ -34,6 +35,8 @@ import com.example.rehabianex.ui.components.RehabianexSecondaryButton
 import com.example.rehabianex.ui.components.ScreenHeader
 import com.example.rehabianex.ui.components.SoftCard
 import com.example.rehabianex.ui.theme.RehabianexColors
+import com.example.rehabianex.validation.EditableProfileFormInput
+import com.example.rehabianex.validation.PhoneNumberValidator
 
 @Composable
 fun PatientProfileScreen(
@@ -42,6 +45,7 @@ fun PatientProfileScreen(
     uiState: PatientProfileUiState,
     consentActionState: FormSaveUiState,
     privacyActionState: FormSaveUiState,
+    profileActionState: FormSaveUiState,
     onRetry: () -> Unit,
     onSetConsent: (Boolean) -> Unit,
     onRevokeConsent: () -> Unit,
@@ -49,6 +53,8 @@ fun PatientProfileScreen(
     onClearConsentMessage: () -> Unit,
     onSavePrivacy: (PrivacyFormInput) -> Unit,
     onClearPrivacyMessage: () -> Unit,
+    onSaveProfile: (EditableProfileFormInput) -> Unit,
+    onClearProfileMessage: () -> Unit,
 ) {
     PatientScreenScaffold(Routes.PatientProfile, onNavigate) {
         ScreenHeader("Perfil", "Privacidad y configuración")
@@ -62,6 +68,7 @@ fun PatientProfileScreen(
                 warning = uiState.warning,
                 consentActionState = consentActionState,
                 privacyActionState = privacyActionState,
+                profileActionState = profileActionState,
                 onNavigate = onNavigate,
                 onLogout = onLogout,
                 onSetConsent = onSetConsent,
@@ -70,6 +77,8 @@ fun PatientProfileScreen(
                 onClearConsentMessage = onClearConsentMessage,
                 onSavePrivacy = onSavePrivacy,
                 onClearPrivacyMessage = onClearPrivacyMessage,
+                onSaveProfile = onSaveProfile,
+                onClearProfileMessage = onClearProfileMessage,
             )
         }
     }
@@ -82,6 +91,7 @@ private fun ProfileContent(
     warning: String?,
     consentActionState: FormSaveUiState,
     privacyActionState: FormSaveUiState,
+    profileActionState: FormSaveUiState,
     onNavigate: (String) -> Unit,
     onLogout: () -> Unit,
     onSetConsent: (Boolean) -> Unit,
@@ -90,12 +100,15 @@ private fun ProfileContent(
     onClearConsentMessage: () -> Unit,
     onSavePrivacy: (PrivacyFormInput) -> Unit,
     onClearPrivacyMessage: () -> Unit,
+    onSaveProfile: (EditableProfileFormInput) -> Unit,
+    onClearProfileMessage: () -> Unit,
 ) {
     var showConsentOptions by rememberSaveable { mutableStateOf(false) }
     var showPrivacyOptions by rememberSaveable { mutableStateOf(false) }
     var confirmPrivateMode by rememberSaveable { mutableStateOf(false) }
     var confirmRevokeConsent by rememberSaveable { mutableStateOf(false) }
     var confirmUnlinkRequest by rememberSaveable { mutableStateOf(false) }
+    var showProfileEditor by rememberSaveable { mutableStateOf(false) }
 
     if (isRefreshing) {
         Text("Actualizando...", color = RehabianexColors.GrayText)
@@ -120,8 +133,26 @@ private fun ProfileContent(
             Column {
                 Text(profile.fullName, fontWeight = FontWeight.Bold)
                 Text(profile.email, color = RehabianexColors.GrayText)
+                Text(profile.phone, color = RehabianexColors.GrayText)
             }
         }
+        Spacer(Modifier.height(8.dp))
+        RehabianexOutlineButton(
+            if (showProfileEditor) "Cerrar edición" else "Editar nombre y teléfono",
+        ) {
+            showProfileEditor = !showProfileEditor
+            onClearProfileMessage()
+        }
+    }
+    if (showProfileEditor) {
+        Spacer(Modifier.height(8.dp))
+        PatientProfileEditCard(
+            profile = profile,
+            actionState = profileActionState,
+            onSave = onSaveProfile,
+        )
+    } else {
+        ProfileActionMessage(profileActionState)
     }
     Spacer(Modifier.height(10.dp))
     SoftCard {
@@ -284,6 +315,83 @@ private fun ProfileContent(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun PatientProfileEditCard(
+    profile: PatientProfileData,
+    actionState: FormSaveUiState,
+    onSave: (EditableProfileFormInput) -> Unit,
+) {
+    val initialPhone = PhoneNumberValidator.parseStored(profile.phone)
+    var fullName by rememberSaveable(profile.registeredName) {
+        mutableStateOf(profile.registeredName)
+    }
+    var phone by rememberSaveable(profile.phone) { mutableStateOf(initialPhone.number) }
+    var phoneRegion by rememberSaveable(profile.phone) { mutableStateOf(initialPhone.region) }
+    val isSaving = actionState is FormSaveUiState.Loading
+    val fieldErrors = (actionState as? FormSaveUiState.Error)?.fieldErrors.orEmpty()
+
+    RehabianexCard {
+        Text("Datos personales", fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        InputField(
+            value = fullName,
+            onValueChange = { if (!isSaving) fullName = it.take(120) },
+            label = "Nombre completo",
+            errorMessage = fieldErrors["fullName"],
+            enabled = !isSaving,
+        )
+        Spacer(Modifier.height(8.dp))
+        PhoneNumberField(
+            value = phone,
+            region = phoneRegion,
+            onValueChange = { if (!isSaving) phone = it },
+            onRegionChange = { region ->
+                if (!isSaving) {
+                    phoneRegion = region
+                    phone = ""
+                }
+            },
+            errorMessage = fieldErrors["phone"],
+            enabled = !isSaving,
+            allowLegacyInternational = true,
+        )
+        Spacer(Modifier.height(8.dp))
+        SoftCard {
+            Text("Correo de acceso", fontWeight = FontWeight.Bold)
+            Text(profile.email)
+            Text(
+                "El correo no se cambia como un dato de perfil: requiere reautenticación y verificación en Firebase.",
+                color = RehabianexColors.GrayText,
+            )
+        }
+        when (actionState) {
+            FormSaveUiState.Idle -> Unit
+            FormSaveUiState.Loading -> Text("Guardando perfil...")
+            is FormSaveUiState.Success -> Text(
+                actionState.message,
+                color = RehabianexColors.GreenDark,
+            )
+            is FormSaveUiState.Error -> {
+                Text(actionState.message, color = RehabianexColors.Red)
+                ValidationFieldMessages(actionState)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        RehabianexButton(
+            text = if (isSaving) "Guardando..." else "Guardar datos",
+            enabled = !isSaving,
+        ) {
+            onSave(
+                EditableProfileFormInput(
+                    fullName = fullName,
+                    phone = phone,
+                    phoneRegion = phoneRegion,
+                ),
+            )
+        }
     }
 }
 

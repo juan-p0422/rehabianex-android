@@ -122,6 +122,7 @@ internal fun NavGraphBuilder.supervisorGraph(
             factory = SupervisorProfileViewModel.Factory(supervisorRepository),
         )
         val uiState = viewModel.uiState.collectAsStateWithLifecycle()
+        val saveState = viewModel.saveState.collectAsStateWithLifecycle()
         LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
             viewModel.refreshIfStale()
         }
@@ -129,7 +130,10 @@ internal fun NavGraphBuilder.supervisorGraph(
             onNavigate = navigate,
             onLogout = onLogout,
             uiState = uiState.value,
+            saveState = saveState.value,
             onRetry = viewModel::load,
+            onSaveProfile = viewModel::saveProfile,
+            onClearSaveMessage = viewModel::clearSaveMessage,
         )
     }
     composable(Routes.SupervisorNotifications) {

@@ -32,6 +32,7 @@ import com.example.rehabianex.data.model.SupervisorPatientsData
 import com.example.rehabianex.data.model.SupervisorPendingRequest
 import com.example.rehabianex.data.model.SupervisorRequestKind
 import com.example.rehabianex.data.model.SupervisorProfileData
+import com.example.rehabianex.data.model.UpdateSupervisorRequest
 import com.example.rehabianex.data.remote.ApiErrorParser
 import com.example.rehabianex.data.remote.ApiService
 import java.security.MessageDigest
@@ -153,6 +154,63 @@ class SupervisorRepository(
         }
         clearSnapshotOnDenied(result, ownerUid)
         return result
+    }
+
+    suspend fun updateOwnProfile(
+        fullName: String,
+        phone: String,
+        supervisorType: String,
+        supervisorTypeOther: String?,
+    ): SupervisorDataResult<String> = safeRequest(
+        defaultUnexpectedMessage = "Ocurrió un error inesperado al actualizar el perfil.",
+    ) {
+        val uid = sessionManager.getUid()?.takeIf(String::isNotBlank)
+            ?: throw EarlyFailureException(
+                SupervisorDataResult.Failure("La sesión local está incompleta.", 401),
+            )
+        val response = authorizedCall {
+            apiService.updateSupervisor(
+                supervisorUid = uid,
+                request = UpdateSupervisorRequest(
+                    fullName = fullName,
+                    phone = phone,
+                    supervisorType = supervisorType,
+                    supervisorTypeOther = supervisorTypeOther,
+                ),
+            )
+        }
+        if (!response.isSuccessful) {
+            throw EarlyFailureException(response.toSupervisorFailure())
+        }
+
+        val profile = response.body()?.data ?: SessionProfileDto(
+            uid = uid,
+            role = "supervisor",
+            fullName = fullName,
+            phone = phone,
+            supervisorType = supervisorType,
+            supervisorTypeOther = supervisorTypeOther,
+        )
+        val currentSnapshot = profileSnapshotDao?.get(uid)
+        profileSnapshotDao?.upsert(
+            SupervisorProfileSnapshotEntity(
+                ownerUid = uid,
+                displayName = profile.fullName.cleanText() ?: fullName,
+                supervisorType = profile.supervisorTypeLabel(),
+                supervisorCode = profile.supervisorCodeOrFallback(),
+                authorized = profile.authorized ?: currentSnapshot?.authorized ?: false,
+                verified = profile.verified ?: currentSnapshot?.verified ?: false,
+                status = profile.status.cleanText()?.lowercase(Locale.getDefault())
+                    ?: currentSnapshot?.status
+                    ?: "sin estado",
+                lastSyncedAt = now(),
+                isStale = false,
+            ),
+        )
+        sessionManager.getCurrentSession()?.let { session ->
+            sessionManager.saveSession(session.copy(displayName = fullName))
+        }
+        response.body()?.message.cleanText() ?: "Perfil actualizado correctamente."
     }
 
     suspend fun loadPatientsData(): SupervisorDataResult<SupervisorPatientsData> = safeRequest {
@@ -285,6 +343,8 @@ class SupervisorRepository(
             status = profile.status.cleanText() ?: "sin estado",
             linkedPatientsCount = linkedPatients.size,
             pendingRequestsCount = pendingRequestsCount,
+            supervisorTypeCode = profile.supervisorType.cleanText(maxLength = 80),
+            supervisorTypeOther = profile.supervisorTypeOther.cleanText(maxLength = 80),
         )
         cacheSupervisorSnapshot(
             profile = profile,
@@ -1206,13 +1266,19 @@ class SupervisorRepository(
     }
 
     private fun SessionProfileDto.supervisorTypeLabel(): String {
-        return when (supervisorType.cleanText()?.lowercase(Locale.getDefault())) {
+        val normalized = supervisorType.cleanText(maxLength = 80)
+        return when (normalized?.lowercase(Locale.getDefault())) {
             "clinical_psychologist" -> "Psicólogo clínico"
             "doctor" -> "Doctor"
+            "psychiatrist" -> "Psiquiatra"
+            "psychologist" -> "Psicólogo"
+            "social_worker" -> "Trabajador social"
             "padrino" -> "Padrino"
             "sponsor" -> "Padrino"
+            "support_sponsor" -> "Padrino o madrina"
             "therapist" -> "Terapeuta"
-            else -> "Supervisor"
+            "other" -> supervisorTypeOther.cleanText(maxLength = 80) ?: "Otro"
+            else -> normalized ?: "Supervisor"
         }
     }
 

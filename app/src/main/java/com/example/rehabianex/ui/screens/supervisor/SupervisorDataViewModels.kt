@@ -17,6 +17,8 @@ import com.example.rehabianex.data.repository.SupervisorDataResult
 import com.example.rehabianex.data.repository.SupervisorRepository
 import com.example.rehabianex.core.validation.MAX_AI_CHAT_QUESTION_LENGTH
 import com.example.rehabianex.core.validation.sanitizeAiChatQuestion
+import com.example.rehabianex.validation.EditableProfileFormInput
+import com.example.rehabianex.validation.ProfileFormValidator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,6 +64,16 @@ sealed interface SupervisorProfileUiState {
     data object Loading : SupervisorProfileUiState
     data class Content(val data: SupervisorProfileData) : SupervisorProfileUiState
     data class Error(val message: String) : SupervisorProfileUiState
+}
+
+sealed interface SupervisorProfileSaveUiState {
+    data object Idle : SupervisorProfileSaveUiState
+    data object Loading : SupervisorProfileSaveUiState
+    data class Success(val message: String) : SupervisorProfileSaveUiState
+    data class Error(
+        val message: String,
+        val fieldErrors: Map<String, String> = emptyMap(),
+    ) : SupervisorProfileSaveUiState
 }
 
 data class SupervisorNotificationsData(
@@ -318,6 +330,9 @@ class SupervisorProfileViewModel(
     private val _uiState =
         MutableStateFlow<SupervisorProfileUiState>(SupervisorProfileUiState.Loading)
     val uiState: StateFlow<SupervisorProfileUiState> = _uiState.asStateFlow()
+    private val _saveState =
+        MutableStateFlow<SupervisorProfileSaveUiState>(SupervisorProfileSaveUiState.Idle)
+    val saveState: StateFlow<SupervisorProfileSaveUiState> = _saveState.asStateFlow()
     private val refreshController = supervisorRefreshController()
 
     init {
@@ -350,6 +365,51 @@ class SupervisorProfileViewModel(
                     false
                 }
             }
+        }
+    }
+
+    fun saveProfile(input: EditableProfileFormInput) {
+        if (_saveState.value is SupervisorProfileSaveUiState.Loading) return
+
+        val validation = ProfileFormValidator.validate(
+            input = input,
+            includeSupervisorType = true,
+        )
+        val profile = validation.value
+        if (profile == null) {
+            _saveState.value = SupervisorProfileSaveUiState.Error(
+                message = "Revisa los datos del perfil.",
+                fieldErrors = validation.fieldErrors,
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _saveState.value = SupervisorProfileSaveUiState.Loading
+            _saveState.value = when (
+                val result = repository.updateOwnProfile(
+                    fullName = profile.fullName,
+                    phone = profile.phone,
+                    supervisorType = checkNotNull(profile.supervisorType),
+                    supervisorTypeOther = profile.supervisorTypeOther,
+                )
+            ) {
+                is SupervisorDataResult.Success -> {
+                    invalidateSupervisorRefreshes()
+                    refreshIfStale(force = true)
+                    SupervisorProfileSaveUiState.Success(result.data)
+                }
+                is SupervisorDataResult.Failure -> SupervisorProfileSaveUiState.Error(
+                    message = result.message,
+                    fieldErrors = result.fieldErrors,
+                )
+            }
+        }
+    }
+
+    fun clearSaveMessage() {
+        if (_saveState.value !is SupervisorProfileSaveUiState.Loading) {
+            _saveState.value = SupervisorProfileSaveUiState.Idle
         }
     }
 
