@@ -93,10 +93,12 @@ interface ApiService {
 
     @GET("admin/supervisors")
     suspend fun adminSupervisors(
+        @Query("q") query: String? = null,
         @Query("status") status: String? = null,
         @Query("authorized") authorized: Boolean? = null,
         @Query("verified") verified: Boolean? = null,
         @Query("limit") limit: Int = 50,
+        @Query("page") page: Int = 1,
     ): Response<AdminSupervisorsResponse>
 
     @GET("admin/supervisors/{uid}")

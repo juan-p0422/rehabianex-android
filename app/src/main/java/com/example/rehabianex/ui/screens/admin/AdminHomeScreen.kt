@@ -41,6 +41,9 @@ fun AdminHomeScreen(
     actionState: AdminSupervisorActionUiState,
     onRetry: () -> Unit,
     onSelectFilter: (AdminSupervisorFilter) -> Unit,
+    onSearch: (String) -> Unit,
+    onPreviousPage: () -> Unit,
+    onNextPage: () -> Unit,
     onAuthorize: (String) -> Unit,
     onReject: (String, String) -> Unit,
     onSuspend: (String, String) -> Unit,
@@ -52,6 +55,10 @@ fun AdminHomeScreen(
     var reasonActionName by rememberSaveable { mutableStateOf("") }
     var reasonActionType by rememberSaveable { mutableStateOf<String?>(null) }
     var actionReason by rememberSaveable { mutableStateOf("") }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var confirmActionUid by rememberSaveable { mutableStateOf<String?>(null) }
+    var confirmActionName by rememberSaveable { mutableStateOf("") }
+    var confirmActionType by rememberSaveable { mutableStateOf<String?>(null) }
     val actionLoading = actionState is AdminSupervisorActionUiState.Loading
 
     ScreenScaffold(
@@ -119,6 +126,20 @@ fun AdminHomeScreen(
         AdminActionNotice(actionState)
         SectionTitle(uiState.filter.sectionTitle())
         Spacer(Modifier.height(10.dp))
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it.take(MAX_SEARCH_LENGTH) },
+            label = { Text("Buscar por nombre, correo, tipo o código") },
+            enabled = !actionLoading,
+            singleLine = true,
+        )
+        Spacer(Modifier.height(8.dp))
+        RehabianexButton(
+            text = "Buscar",
+            enabled = !actionLoading,
+            onClick = { onSearch(searchQuery) },
+        )
+        Spacer(Modifier.height(10.dp))
 
         when (uiState) {
             is AdminSupervisorsUiState.Loading -> RehabianexCard {
@@ -157,7 +178,11 @@ fun AdminHomeScreen(
                             supervisor = supervisor,
                             filter = uiState.filter,
                             actionLoading = actionLoading,
-                            onAuthorize = onAuthorize,
+                            onAuthorize = { uid, name ->
+                                confirmActionUid = uid
+                                confirmActionName = name
+                                confirmActionType = AUTHORIZE_ACTION
+                            },
                             onReject = { uid, name ->
                                 reasonActionUid = uid
                                 reasonActionName = name
@@ -170,7 +195,32 @@ fun AdminHomeScreen(
                                 reasonActionType = SUSPEND_ACTION
                                 actionReason = ""
                             },
-                            onReactivate = onReactivate,
+                            onReactivate = { uid, name ->
+                                confirmActionUid = uid
+                                confirmActionName = name
+                                confirmActionType = REACTIVATE_ACTION
+                            },
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Página ${uiState.page} · ${uiState.total} resultado(s)",
+                        color = RehabianexColors.GrayText,
+                    )
+                    if (uiState.page > 1) {
+                        Spacer(Modifier.height(8.dp))
+                        RehabianexOutlineButton(
+                            text = "Página anterior",
+                            enabled = !actionLoading,
+                            onClick = onPreviousPage,
+                        )
+                    }
+                    if (uiState.hasMore) {
+                        Spacer(Modifier.height(8.dp))
+                        RehabianexButton(
+                            text = "Página siguiente",
+                            enabled = !actionLoading,
+                            onClick = onNextPage,
                         )
                     }
                 }
@@ -236,6 +286,44 @@ fun AdminHomeScreen(
             },
         )
     }
+
+    confirmActionUid?.let { uid ->
+        val reactivating = confirmActionType == REACTIVATE_ACTION
+        AlertDialog(
+            onDismissRequest = {
+                if (!actionLoading) confirmActionUid = null
+            },
+            title = {
+                Text(if (reactivating) "Reactivar supervisor" else "Autorizar supervisor")
+            },
+            text = {
+                Text(
+                    if (reactivating) {
+                        "Confirma la reactivación de $confirmActionName. Esto restaura las funciones del supervisor, pero no crea vínculos ni consentimientos."
+                    } else {
+                        "Confirma la autorización de $confirmActionName. Esto habilita la cuenta, pero no crea vínculos ni consentimientos con pacientes."
+                    },
+                )
+            },
+            confirmButton = {
+                Button(
+                    enabled = !actionLoading,
+                    onClick = {
+                        if (reactivating) onReactivate(uid) else onAuthorize(uid)
+                        confirmActionUid = null
+                    },
+                ) {
+                    Text(if (reactivating) "Confirmar reactivación" else "Confirmar autorización")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !actionLoading,
+                    onClick = { confirmActionUid = null },
+                ) { Text("Cancelar") }
+            },
+        )
+    }
 }
 
 @Composable
@@ -243,10 +331,10 @@ private fun SupervisorManagementCard(
     supervisor: AdminSupervisorDto,
     filter: AdminSupervisorFilter,
     actionLoading: Boolean,
-    onAuthorize: (String) -> Unit,
+    onAuthorize: (String, String) -> Unit,
     onReject: (String, String) -> Unit,
     onSuspend: (String, String) -> Unit,
-    onReactivate: (String) -> Unit,
+    onReactivate: (String, String) -> Unit,
 ) {
     val uid = supervisor.uid.orEmpty()
     val fullName = supervisor.fullName.orReadable("Supervisor sin nombre")
@@ -269,7 +357,7 @@ private fun SupervisorManagementCard(
                 RehabianexButton(
                     text = "Autorizar",
                     enabled = canAct,
-                    onClick = { onAuthorize(uid) },
+                    onClick = { onAuthorize(uid, fullName) },
                 )
                 Spacer(Modifier.height(8.dp))
                 RehabianexOutlineButton(
@@ -291,7 +379,7 @@ private fun SupervisorManagementCard(
                 RehabianexButton(
                     text = "Reactivar",
                     enabled = canAct,
-                    onClick = { onReactivate(uid) },
+                    onClick = { onReactivate(uid, fullName) },
                 )
             }
         }
@@ -430,7 +518,10 @@ private fun String.toAdminFilter(): AdminSupervisorFilter? = when (this) {
 
 private const val REJECT_ACTION = "reject"
 private const val SUSPEND_ACTION = "suspend"
+private const val AUTHORIZE_ACTION = "authorize"
+private const val REACTIVATE_ACTION = "reactivate"
 private const val MAX_ACTION_REASON_LENGTH = 1_000
+private const val MAX_SEARCH_LENGTH = 120
 private const val ADMIN_LOGOUT_ACTION = "admin_logout_action"
 private const val ADMIN_PENDING_ROUTE = "admin_pending"
 private const val ADMIN_ACTIVE_ROUTE = "admin_active"

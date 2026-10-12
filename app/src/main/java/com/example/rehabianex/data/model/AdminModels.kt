@@ -22,6 +22,11 @@ data class AdminSupervisorDto(
 data class AdminSupervisorsResponse(
     val ok: Boolean? = null,
     val count: Int? = null,
+    val page: Int? = null,
+    val limit: Int? = null,
+    val total: Int? = null,
+    @SerializedName("has_more")
+    val hasMore: Boolean? = null,
     val data: List<AdminSupervisorDto>? = null,
 )
 

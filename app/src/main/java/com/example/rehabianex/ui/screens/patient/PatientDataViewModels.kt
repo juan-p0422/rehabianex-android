@@ -974,12 +974,38 @@ class PatientProfileViewModel(
         }
     }
 
-    fun setConsent(enabled: Boolean) {
+    fun setConsent(
+        enabled: Boolean,
+        selectedScopes: Set<String> = emptySet(),
+    ) {
         if (_consentActionState.value is FormSaveUiState.Loading) return
 
         viewModelScope.launch {
             _consentActionState.value = FormSaveUiState.Loading
-            _consentActionState.value = when (val result = repository.setSupervisorConsent(enabled)) {
+            _consentActionState.value = when (
+                val result = repository.setSupervisorConsent(
+                    enabled = enabled,
+                    selectedScopes = selectedScopes.takeIf { enabled },
+                )
+            ) {
+                is PatientDataResult.Success -> {
+                    invalidatePatientRefreshes()
+                    refreshIfStale(force = true)
+                    FormSaveUiState.Success(result.data)
+                }
+                is PatientDataResult.Failure -> profileActionFailure(result)
+            }
+        }
+    }
+
+    fun cancelPendingSupervisorRequest(requestId: String) {
+        if (_consentActionState.value is FormSaveUiState.Loading) return
+
+        viewModelScope.launch {
+            _consentActionState.value = FormSaveUiState.Loading
+            _consentActionState.value = when (
+                val result = repository.cancelPendingSupervisorRequest(requestId)
+            ) {
                 is PatientDataResult.Success -> {
                     invalidatePatientRefreshes()
                     refreshIfStale(force = true)

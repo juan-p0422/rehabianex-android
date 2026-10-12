@@ -53,6 +53,7 @@ import com.example.rehabianex.data.model.SupervisionRequestDto
 import com.example.rehabianex.data.model.SupervisorCodePreview
 import com.example.rehabianex.data.model.UpdateAgendaEventRequest
 import com.example.rehabianex.data.model.UpdateConsentRequest
+import com.example.rehabianex.data.model.SupervisionPolicy
 import com.example.rehabianex.data.model.UpdatePatientRequest
 import com.example.rehabianex.data.model.UpdateSupervisionRequest
 import com.example.rehabianex.data.model.isPatientPrivacyRestricted
@@ -256,9 +257,17 @@ class PatientRepository(
         val result = safeRequest {
         val profile = readMeProfile()
         val supervisorUid = profile.supervisorUid.safeIdentifierOrNull().orEmpty()
-        val supervisorName = loadSupervisorName(supervisorUid)
+        val linkedSupervisor = profile.supervisor
+            ?.takeIf { it.uid.safeIdentifierOrNull() == supervisorUid }
+        val supervisorName = linkedSupervisor?.fullName.cleanText()
+            ?: supervisorUid.takeIf(String::isNotBlank)?.let { "Supervisor vinculado" }
+        val supervisorType = linkedSupervisor?.supervisorType
+            ?.supervisorTypePreviewLabel()
         val consent = loadCurrentConsentOrNull(supervisorUid)
         val pendingRequests = loadPendingSupervisionRequests()
+        val pendingLinkRequestId = pendingRequests
+            .firstOrNull { it.isLinkRequest() }
+            ?.resourceId()
         val supervisionState = profile.supervisionState(consent, pendingRequests)
         val identity = identityForProfile(profile)
         val registeredName = identity.first
@@ -280,9 +289,12 @@ class PatientRepository(
             email = profile.email.cleanText() ?: "Sin correo registrado",
             phone = profile.phone.cleanText() ?: "Sin teléfono registrado",
             supervisorText = supervisionState.description(supervisorName, consentActive),
+            supervisorType = supervisorType,
             supervisorUid = supervisorUid,
             consentId = consent?.resourceId(),
             consentActive = consentActive,
+            consentScope = SupervisionPolicy.normalizeScopes(consent?.scope.orEmpty()),
+            pendingLinkRequestId = pendingLinkRequestId,
             privacyText = privacyText,
             isAnonymous = profile.isAnonymous == true,
             supervisionState = supervisionState,
@@ -313,9 +325,12 @@ class PatientRepository(
             email = sessionManager.getEmail().cleanText() ?: "Sin correo registrado",
             phone = "Se actualizará al conectar",
             supervisorText = "Actualizando el estado de supervisión…",
+            supervisorType = null,
             supervisorUid = "",
             consentId = null,
             consentActive = false,
+            consentScope = emptyList(),
+            pendingLinkRequestId = null,
             privacyText = privacyText,
             isAnonymous = entity.isAnonymous,
             privacyMode = entity.privacyMode,
@@ -663,6 +678,7 @@ class PatientRepository(
 
     suspend fun setSupervisorConsent(
         enabled: Boolean,
+        selectedScopes: Set<String>? = null,
     ): PatientDataResult<String> = safeRequest(
         defaultUnexpectedMessage = "Ocurrió un error inesperado al actualizar el consentimiento.",
     ) {
@@ -673,6 +689,16 @@ class PatientRepository(
             )
         val currentConsent = loadCurrentConsentOrNull(supervisorUid)
         val currentConsentId = currentConsent?.resourceId()
+        val normalizedScopes = selectedScopes?.let(SupervisionPolicy::normalizeScopes)
+        if (enabled && normalizedScopes.isNullOrEmpty()) {
+            throw EarlyFailureException(
+                PatientDataResult.Failure(
+                    message = "Selecciona al menos un dato para compartir.",
+                    fieldErrors = mapOf("scope" to "Selecciona al menos un dato para compartir."),
+                    statusCode = 422,
+                ),
+            )
+        }
 
         val response = if (currentConsentId != null) {
             authorizedCall {
@@ -680,6 +706,7 @@ class PatientRepository(
                     consentId = currentConsentId,
                     request = UpdateConsentRequest(
                         status = if (enabled) CONSENT_STATUS_ACTIVE else CONSENT_STATUS_PAUSED,
+                        scope = normalizedScopes?.takeIf { enabled },
                     ),
                 )
             }
@@ -694,7 +721,7 @@ class PatientRepository(
                         type = "supervision_and_alerts",
                         explicitConsent = true,
                         consentText = "Autorizo que mi supervisor consulte mis registros de recuperación según los alcances seleccionados.",
-                        scope = DEFAULT_CONSENT_SCOPE,
+                        scope = normalizedScopes.orEmpty(),
                     ),
                 )
             }
@@ -712,6 +739,43 @@ class PatientRepository(
                 response.toPatientFailure(),
             )
         }
+    }
+
+    suspend fun cancelPendingSupervisorRequest(
+        requestIdInput: String,
+    ): PatientDataResult<String> = safeRequest(
+        defaultUnexpectedMessage = "No fue posible retirar la solicitud pendiente.",
+    ) {
+        val requestId = requestIdInput.safeIdentifier()
+        val ownsPendingLink = loadPendingSupervisionRequests().any { request ->
+            request.isLinkRequest() && request.resourceId() == requestId
+        }
+        if (!ownsPendingLink) {
+            throw EarlyFailureException(
+                PatientDataResult.Failure(
+                    message = "La solicitud ya no está pendiente. Actualiza la información.",
+                    statusCode = 409,
+                ),
+            )
+        }
+
+        val response = authorizedCall {
+            apiService.updateSupervisionRequest(
+                requestId = requestId,
+                request = UpdateSupervisionRequest(status = CANCELLED_REQUEST_STATUS),
+            )
+        }
+        if (!response.isSuccessful) {
+            throw EarlyFailureException(
+                response.toPatientFailure(
+                    fallbackMessage = response.supervisionCancellationFallbackMessage(),
+                ),
+            )
+        }
+
+        refreshPatientSupervision()
+        response.body()?.message.cleanText()
+            ?: "Solicitud retirada. Puedes elegir otro supervisor cuando lo necesites."
     }
 
     suspend fun revokeSupervisorConsent(): PatientDataResult<String> = safeRequest(
@@ -1040,10 +1104,6 @@ class PatientRepository(
 
     private suspend fun loadProfileOrNull(): SessionProfileDto? {
         return runCatching { readMeProfile() }.getOrNull()
-    }
-
-    private fun loadSupervisorName(supervisorUid: String): String? {
-        return if (supervisorUid.isBlank()) null else "Supervisor vinculado"
     }
 
     private suspend fun loadCurrentConsentOrNull(supervisorUid: String): ConsentDto? {
@@ -2325,12 +2385,6 @@ class PatientRepository(
         val PENDING_SUPERVISION_STATUSES = setOf("pending", "requested")
         val REJECTED_SUPERVISION_STATUSES = setOf("rejected", "denied")
         val TIME_REGEX = Regex("^([01]\\d|2[0-3]):[0-5]\\d$")
-        val DEFAULT_CONSENT_SCOPE = listOf(
-            "patient_notes",
-            "agenda_events",
-            "support_contacts",
-            "ai_chat_summary",
-        )
         val TimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
         val DateLabelFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern(
             "EEE d MMM",

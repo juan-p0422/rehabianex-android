@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -16,10 +17,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.rehabianex.data.model.PatientProfileData
 import com.example.rehabianex.data.model.PatientSupervisionState
+import com.example.rehabianex.data.model.SupervisionPolicy
 import com.example.rehabianex.navigation.Routes
 import com.example.rehabianex.ui.components.AvatarCircle
 import com.example.rehabianex.ui.components.ChipSelector
@@ -47,9 +51,10 @@ fun PatientProfileScreen(
     privacyActionState: FormSaveUiState,
     profileActionState: FormSaveUiState,
     onRetry: () -> Unit,
-    onSetConsent: (Boolean) -> Unit,
+    onSetConsent: (Boolean, Set<String>) -> Unit,
     onRevokeConsent: () -> Unit,
     onRequestSupervisorUnlink: () -> Unit,
+    onCancelPendingSupervisorRequest: (String) -> Unit,
     onClearConsentMessage: () -> Unit,
     onSavePrivacy: (PrivacyFormInput) -> Unit,
     onClearPrivacyMessage: () -> Unit,
@@ -74,6 +79,7 @@ fun PatientProfileScreen(
                 onSetConsent = onSetConsent,
                 onRevokeConsent = onRevokeConsent,
                 onRequestSupervisorUnlink = onRequestSupervisorUnlink,
+                onCancelPendingSupervisorRequest = onCancelPendingSupervisorRequest,
                 onClearConsentMessage = onClearConsentMessage,
                 onSavePrivacy = onSavePrivacy,
                 onClearPrivacyMessage = onClearPrivacyMessage,
@@ -94,9 +100,10 @@ private fun ProfileContent(
     profileActionState: FormSaveUiState,
     onNavigate: (String) -> Unit,
     onLogout: () -> Unit,
-    onSetConsent: (Boolean) -> Unit,
+    onSetConsent: (Boolean, Set<String>) -> Unit,
     onRevokeConsent: () -> Unit,
     onRequestSupervisorUnlink: () -> Unit,
+    onCancelPendingSupervisorRequest: (String) -> Unit,
     onClearConsentMessage: () -> Unit,
     onSavePrivacy: (PrivacyFormInput) -> Unit,
     onClearPrivacyMessage: () -> Unit,
@@ -108,6 +115,7 @@ private fun ProfileContent(
     var confirmPrivateMode by rememberSaveable { mutableStateOf(false) }
     var confirmRevokeConsent by rememberSaveable { mutableStateOf(false) }
     var confirmUnlinkRequest by rememberSaveable { mutableStateOf(false) }
+    var confirmCancelPendingRequest by rememberSaveable { mutableStateOf(false) }
     var showProfileEditor by rememberSaveable { mutableStateOf(false) }
 
     if (isRefreshing) {
@@ -174,6 +182,9 @@ private fun ProfileContent(
             fontWeight = FontWeight.Bold,
         )
         Text(profile.supervisorText)
+        profile.supervisorType?.let { type ->
+            Text("Tipo: $type", color = RehabianexColors.GrayText)
+        }
     }
     Spacer(Modifier.height(10.dp))
     RehabianexCard {
@@ -211,9 +222,10 @@ private fun ProfileContent(
             ConsentManagementCard(
                 profile = profile,
                 consentActionState = consentActionState,
-                onActivate = { onSetConsent(true) },
+                onActivate = { scopes -> onSetConsent(true, scopes) },
                 onAskMakePrivate = { confirmPrivateMode = true },
                 onAskRevoke = { confirmRevokeConsent = true },
+                onAskCancelPending = { confirmCancelPendingRequest = true },
                 onLinkSupervisor = { onNavigate(Routes.SupervisorLink) },
             )
         }
@@ -253,7 +265,7 @@ private fun ProfileContent(
                 TextButton(
                     onClick = {
                         confirmPrivateMode = false
-                        onSetConsent(false)
+                        onSetConsent(false, emptySet())
                     },
                 ) {
                     Text("Poner en privado", color = RehabianexColors.Red)
@@ -263,6 +275,35 @@ private fun ProfileContent(
                 TextButton(onClick = { confirmPrivateMode = false }) {
                     Text("Cancelar")
                 }
+            },
+        )
+    }
+
+    if (confirmCancelPendingRequest) {
+        AlertDialog(
+            onDismissRequest = {
+                if (consentActionState !is FormSaveUiState.Loading) {
+                    confirmCancelPendingRequest = false
+                }
+            },
+            title = { Text("Retirar solicitud pendiente") },
+            text = {
+                Text("La solicitud se marcará como cancelada. Esto no elimina el registro ni crea una relación de supervisión.")
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = consentActionState !is FormSaveUiState.Loading,
+                    onClick = {
+                        profile.pendingLinkRequestId?.let(onCancelPendingSupervisorRequest)
+                        confirmCancelPendingRequest = false
+                    },
+                ) { Text("Retirar solicitud") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = consentActionState !is FormSaveUiState.Loading,
+                    onClick = { confirmCancelPendingRequest = false },
+                ) { Text("Conservar") }
             },
         )
     }
@@ -528,11 +569,22 @@ private fun PrivacyModeCard(
 private fun ConsentManagementCard(
     profile: PatientProfileData,
     consentActionState: FormSaveUiState,
-    onActivate: () -> Unit,
+    onActivate: (Set<String>) -> Unit,
     onAskMakePrivate: () -> Unit,
     onAskRevoke: () -> Unit,
+    onAskCancelPending: () -> Unit,
     onLinkSupervisor: () -> Unit,
 ) {
+    var selectedScopes by rememberSaveable(profile.consentId, profile.consentScope) {
+        mutableStateOf(profile.consentScope)
+    }
+    var editingScopes by rememberSaveable(profile.consentId, profile.consentActive) {
+        mutableStateOf(!profile.consentActive)
+    }
+    val isLoading = consentActionState is FormSaveUiState.Loading
+    val canSelectScopes = profile.supervisionState == PatientSupervisionState.Active ||
+        profile.supervisionState == PatientSupervisionState.Paused
+
     RehabianexCard {
         Text("Consentimiento de supervisión", fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
@@ -545,7 +597,7 @@ private fun ConsentManagementCard(
                 PatientSupervisionState.LinkRejected ->
                     "La solicitud fue rechazada. Puedes intentar con otro supervisor."
                 PatientSupervisionState.Active -> if (profile.consentActive) {
-                    "Activo para notas, agenda, contactos de apoyo y resumen IA autorizado."
+                    "Consentimiento activo para ${profile.consentScope.size} alcance(s) seleccionado(s)."
                 } else {
                     "La supervisión fue aceptada. Activa el consentimiento para compartir los alcances seleccionados."
                 }
@@ -581,11 +633,96 @@ private fun ConsentManagementCard(
             profile.supervisionState == PatientSupervisionState.UnlinkPending
         ) {
             Text("Actualiza el estado cuando la otra persona responda.", color = RehabianexColors.GrayText)
+            if (profile.supervisionState == PatientSupervisionState.LinkPending &&
+                !profile.pendingLinkRequestId.isNullOrBlank()
+            ) {
+                Spacer(Modifier.height(8.dp))
+                RehabianexOutlineButton(
+                    text = "Retirar solicitud pendiente",
+                    enabled = !isLoading,
+                    onClick = onAskCancelPending,
+                )
+            }
         } else if (profile.supervisorUid.isBlank()) {
             RehabianexOutlineButton("Vincular supervisor", onClick = onLinkSupervisor)
-            } else if (profile.consentActive) {
+        } else if (profile.supervisionState == PatientSupervisionState.Revoked) {
+            Text(
+                "La revocación bloquea consultas posteriores, pero no borra información consultada previamente.",
+                color = RehabianexColors.GrayText,
+            )
+        } else if (canSelectScopes) {
+            if (profile.consentActive && !editingScopes) {
+                profile.consentScope.forEach { scope ->
+                    Text("• ${scopeLabel(scope)}", color = RehabianexColors.GrayText)
+                }
+                Spacer(Modifier.height(8.dp))
+                RehabianexOutlineButton(
+                    text = "Editar datos compartidos",
+                    enabled = !isLoading,
+                    onClick = { editingScopes = true },
+                )
+            } else {
+                Text(
+                    "Selecciona únicamente los datos que autorizas. Ninguna opción se activa automáticamente.",
+                    color = RehabianexColors.GrayText,
+                )
+                Spacer(Modifier.height(6.dp))
+                SupervisionPolicy.consentScopes.forEach { option ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            modifier = Modifier.semantics {
+                                contentDescription = "Compartir ${option.label}"
+                            },
+                            checked = option.code in selectedScopes,
+                            enabled = !isLoading,
+                            onCheckedChange = { checked ->
+                                selectedScopes = if (checked) {
+                                    selectedScopes + option.code
+                                } else {
+                                    selectedScopes - option.code
+                                }
+                            },
+                        )
+                        Column {
+                            Text(option.label, fontWeight = FontWeight.Bold)
+                            Text(option.description, color = RehabianexColors.GrayText)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                RehabianexButton(
+                    text = when {
+                        profile.consentActive -> "Guardar permisos"
+                        profile.supervisionState == PatientSupervisionState.Paused ->
+                            "Reactivar consentimiento"
+                        else -> "Activar consentimiento"
+                    },
+                    enabled = selectedScopes.isNotEmpty() && !isLoading,
+                    onClick = {
+                        onActivate(selectedScopes.toSet())
+                        editingScopes = false
+                    },
+                )
+                if (profile.consentActive) {
+                    Spacer(Modifier.height(8.dp))
+                    RehabianexOutlineButton(
+                        text = "Cancelar edición",
+                        enabled = !isLoading,
+                        onClick = {
+                            selectedScopes = profile.consentScope
+                            editingScopes = false
+                        },
+                    )
+                }
+            }
+
+            if (profile.consentActive) {
+                Spacer(Modifier.height(8.dp))
                 RehabianexDangerButton(
                     text = "Poner seguimiento en privado",
+                    enabled = !isLoading,
                     onClick = onAskMakePrivate,
                 )
                 Spacer(Modifier.height(8.dp))
@@ -594,23 +731,22 @@ private fun ConsentManagementCard(
                     enabled = consentActionState !is FormSaveUiState.Loading,
                     onClick = onAskRevoke,
                 )
-            } else {
-                RehabianexButton(
-                text = "Activar consentimiento",
-                enabled = consentActionState !is FormSaveUiState.Loading,
-                    onClick = onActivate,
+            } else if (profile.supervisionState == PatientSupervisionState.Paused) {
+                Spacer(Modifier.height(8.dp))
+                RehabianexDangerButton(
+                    text = "Revocar consentimiento",
+                    enabled = !isLoading,
+                    onClick = onAskRevoke,
                 )
-                if (profile.supervisionState == PatientSupervisionState.Paused) {
-                    Spacer(Modifier.height(8.dp))
-                    RehabianexDangerButton(
-                        text = "Revocar consentimiento",
-                        enabled = consentActionState !is FormSaveUiState.Loading,
-                        onClick = onAskRevoke,
-                    )
-                }
             }
+        }
     }
 }
+
+private fun scopeLabel(scope: String): String = SupervisionPolicy.consentScopes
+    .firstOrNull { it.code == scope }
+    ?.label
+    ?: scope
 
 @Composable
 private fun ValidationFieldMessages(error: FormSaveUiState.Error) {

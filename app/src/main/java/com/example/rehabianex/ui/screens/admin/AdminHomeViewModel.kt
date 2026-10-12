@@ -37,6 +37,10 @@ sealed interface AdminSupervisorsUiState {
         val isRefreshing: Boolean = false,
         val refreshMessage: String? = null,
         val listAuthoritative: Boolean = true,
+        val query: String = "",
+        val page: Int = 1,
+        val total: Int = 0,
+        val hasMore: Boolean = false,
     ) : AdminSupervisorsUiState
 
     data class Error(
@@ -64,6 +68,8 @@ class AdminHomeViewModel(
     private val repository: AdminRepository,
 ) : ViewModel() {
     private var selectedFilter = AdminSupervisorFilter.PendingReview
+    private var selectedQuery = ""
+    private var selectedPage = 1
     private val _uiState =
         MutableStateFlow<AdminSupervisorsUiState>(
             AdminSupervisorsUiState.Loading(selectedFilter),
@@ -96,6 +102,27 @@ class AdminHomeViewModel(
         }
 
         selectedFilter = filter
+        selectedPage = 1
+        refreshIfStale(force = true)
+    }
+
+    fun search(query: String) {
+        if (_actionState.value is AdminSupervisorActionUiState.Loading) return
+        selectedQuery = query.trim().take(MAX_SEARCH_LENGTH)
+        selectedPage = 1
+        refreshIfStale(force = true)
+    }
+
+    fun previousPage() {
+        if (selectedPage <= 1 || _actionState.value is AdminSupervisorActionUiState.Loading) return
+        selectedPage--
+        refreshIfStale(force = true)
+    }
+
+    fun nextPage() {
+        val content = _uiState.value as? AdminSupervisorsUiState.Content ?: return
+        if (!content.hasMore || _actionState.value is AdminSupervisorActionUiState.Loading) return
+        selectedPage++
         refreshIfStale(force = true)
     }
 
@@ -182,20 +209,28 @@ class AdminHomeViewModel(
                     dashboard = it,
                     isRefreshing = true,
                     listAuthoritative = false,
+                    query = selectedQuery,
+                    page = selectedPage,
                 )
             } ?: AdminSupervisorsUiState.Loading(filter)
         }
 
         return when (
             val result = repository.supervisors(
+                query = selectedQuery.takeIf(String::isNotBlank),
                 status = filter.apiStatus,
+                page = selectedPage,
             )
         ) {
             is AdminDataResult.Success -> {
                 _uiState.value = AdminSupervisorsUiState.Content(
                     filter = filter,
-                    supervisors = result.data,
+                    supervisors = result.data.supervisors,
                     dashboard = repository.cachedDashboard(),
+                    query = selectedQuery,
+                    page = result.data.page,
+                    total = result.data.total,
+                    hasMore = result.data.hasMore,
                 )
                 true
             }
@@ -208,6 +243,8 @@ class AdminHomeViewModel(
                         dashboard = it,
                         refreshMessage = result.message,
                         listAuthoritative = false,
+                        query = selectedQuery,
+                        page = selectedPage,
                     )
                 } ?: AdminSupervisorsUiState.Error(filter, result.message)
                 false
@@ -223,6 +260,10 @@ class AdminHomeViewModel(
             require(modelClass.isAssignableFrom(AdminHomeViewModel::class.java))
             return AdminHomeViewModel(repository) as T
         }
+    }
+
+    private companion object {
+        const val MAX_SEARCH_LENGTH = 120
     }
 
 }

@@ -39,6 +39,14 @@ data class AdminDashboardCacheData(
     val lastSyncedAt: Long,
 )
 
+data class AdminSupervisorPage(
+    val supervisors: List<AdminSupervisorDto>,
+    val page: Int,
+    val limit: Int,
+    val total: Int,
+    val hasMore: Boolean,
+)
+
 class AdminRepository(
     private val apiService: ApiService,
     private val sessionManager: SessionManager? = null,
@@ -65,31 +73,57 @@ class AdminRepository(
     }
 
     suspend fun supervisors(
+        query: String? = null,
         status: String? = null,
         authorized: Boolean? = null,
         verified: Boolean? = null,
         limit: Int = DEFAULT_LIMIT,
-    ): AdminDataResult<List<AdminSupervisorDto>> {
+        page: Int = 1,
+    ): AdminDataResult<AdminSupervisorPage> {
         if (limit !in 1..MAX_LIMIT) {
             return validationFailure(
                 field = "limit",
                 message = "El límite debe estar entre 1 y 100.",
             )
         }
+        if (page < 1) {
+            return validationFailure(
+                field = "page",
+                message = "La página debe ser mayor o igual a 1.",
+            )
+        }
+        if (query != null && (query.length > MAX_QUERY_LENGTH || query.any(Char::isISOControl))) {
+            return validationFailure(
+                field = "q",
+                message = "La búsqueda debe tener hasta 120 caracteres y no incluir controles.",
+            )
+        }
+        val cleanQuery = query.cleanOptionalQuery()
 
         val result = execute(
             request = {
                 apiService.adminSupervisors(
+                    query = cleanQuery,
                     status = status,
                     authorized = authorized,
                     verified = verified,
                     limit = limit,
+                    page = page,
                 )
             },
-            transform = { response -> response.data.orEmpty() },
+            transform = { response ->
+                val supervisors = response.data.orEmpty()
+                AdminSupervisorPage(
+                    supervisors = supervisors,
+                    page = response.page ?: page,
+                    limit = response.limit ?: limit,
+                    total = response.total ?: response.count ?: supervisors.size,
+                    hasMore = response.hasMore ?: (supervisors.size == limit),
+                )
+            },
         )
-        if (result is AdminDataResult.Success && status != null) {
-            cacheAdminSummary(status, result.data.size)
+        if (result is AdminDataResult.Success && status != null && cleanQuery == null) {
+            cacheAdminSummary(status, result.data.total)
         }
         return result
     }
@@ -308,13 +342,6 @@ class AdminRepository(
         SessionInvalidationBus.notifySessionExpired()
     }
 
-    private companion object {
-        const val DEFAULT_LIMIT = 50
-        const val MAX_LIMIT = 100
-        const val MAX_UID_LENGTH = 128
-        const val MAX_ACTION_TEXT_LENGTH = 1_000
-    }
-
     private class SessionRefreshException(
         val statusCode: Int? = null,
         val invalidatesSession: Boolean = false,
@@ -335,4 +362,16 @@ class AdminRepository(
         ?.takeIf(String::isNotEmpty)
 
     private fun String.cleanRequiredText(): String? = cleanOptionalText()
+
+    private fun String?.cleanOptionalQuery(): String? = this
+        ?.trim()
+        ?.takeIf(String::isNotEmpty)
+
+    private companion object {
+        const val DEFAULT_LIMIT = 50
+        const val MAX_LIMIT = 100
+        const val MAX_UID_LENGTH = 128
+        const val MAX_ACTION_TEXT_LENGTH = 1_000
+        const val MAX_QUERY_LENGTH = 120
+    }
 }

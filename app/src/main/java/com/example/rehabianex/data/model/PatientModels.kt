@@ -49,6 +49,7 @@ data class SessionProfileDto(
     val supervisionEndedAt: String? = null,
     @SerializedName("sobriety_start_date")
     val sobrietyStartDate: String? = null,
+    val supervisor: SupervisorPublicDto? = null,
 )
 
 data class ResourceListResponse<T>(
@@ -259,6 +260,7 @@ data class UpdateConsentRequest(
     @SerializedName("explicit_consent")
     val explicitConsent: Boolean? = null,
     val status: String? = null,
+    val scope: List<String>? = null,
 )
 
 data class UnlinkSupervisionResponse(
@@ -605,9 +607,12 @@ data class PatientProfileData(
     val email: String,
     val phone: String,
     val supervisorText: String,
+    val supervisorType: String? = null,
     val supervisorUid: String,
     val consentId: String?,
     val consentActive: Boolean,
+    val consentScope: List<String> = emptyList(),
+    val pendingLinkRequestId: String? = null,
     val privacyText: String,
     val isAnonymous: Boolean,
     val supervisionState: PatientSupervisionState = PatientSupervisionState.NoSupervisor,

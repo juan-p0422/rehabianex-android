@@ -36,6 +36,10 @@ class AdminRepositoryTest {
                         AdminSupervisorsResponse(
                             ok = true,
                             count = 1,
+                            page = 2,
+                            limit = 1,
+                            total = 3,
+                            hasMore = true,
                             data = listOf(expected),
                         ),
                     )
@@ -45,10 +49,18 @@ class AdminRepositoryTest {
             },
         )
 
-        val result = repository.supervisors(status = "pending_review")
+        val result = repository.supervisors(
+            query = "Laura",
+            status = "pending_review",
+            limit = 1,
+            page = 2,
+        )
 
         val success = result as AdminDataResult.Success
-        assertEquals(listOf(expected), success.data)
+        assertEquals(listOf(expected), success.data.supervisors)
+        assertEquals(2, success.data.page)
+        assertEquals(3, success.data.total)
+        assertTrue(success.data.hasMore)
     }
 
     @Test

@@ -46,7 +46,7 @@ class AdminPendingSupervisorFlowTest {
             ) { _, method, arguments ->
                 when (method.name) {
                     "adminSupervisors" -> {
-                        requestedStatuses += arguments?.firstOrNull() as? String
+                        requestedStatuses += arguments?.getOrNull(1) as? String
                         val data = if (pending) listOf(pendingSupervisor) else emptyList()
                         Response.success(
                             AdminSupervisorsResponse(
@@ -122,7 +122,7 @@ class AdminPendingSupervisorFlowTest {
             ) { _, method, arguments ->
                 when (method.name) {
                     "adminSupervisors" -> {
-                        val requestedStatus = arguments?.firstOrNull() as? String
+                        val requestedStatus = arguments?.getOrNull(1) as? String
                         requestedStatuses += requestedStatus
                         val data = if (requestedStatus == currentStatus) {
                             listOf(

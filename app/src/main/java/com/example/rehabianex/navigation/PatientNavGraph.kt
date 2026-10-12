@@ -221,6 +221,7 @@ internal fun NavGraphBuilder.patientGraph(
                 onSetConsent = viewModel::setConsent,
                 onRevokeConsent = viewModel::revokeConsent,
                 onRequestSupervisorUnlink = viewModel::requestSupervisorUnlink,
+                onCancelPendingSupervisorRequest = viewModel::cancelPendingSupervisorRequest,
             onClearConsentMessage = viewModel::clearConsentMessage,
             onSavePrivacy = viewModel::savePrivacy,
             onClearPrivacyMessage = viewModel::clearPrivacyMessage,
