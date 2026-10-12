@@ -57,6 +57,8 @@ data class DailyNoteFormInput(
     val sober: String,
     val triggers: Set<String>,
     val copingActions: Set<String>,
+    val otherTrigger: String = "",
+    val otherCopingAction: String = "",
     val note: String,
 )
 
@@ -241,16 +243,18 @@ class EmotionalCheckinViewModel(
             "No" -> false
             else -> null
         }
-        val safeTriggers = triggers
-            .filter { it in ALLOWED_TRIGGERS }
+        val cleanOtherTrigger = otherTrigger.cleanFreeText(120)
+        val cleanOtherCopingAction = otherCopingAction.cleanFreeText(120)
+        val safeTriggers = (triggers.filter { it in ALLOWED_TRIGGERS } +
+            listOfNotNull(cleanOtherTrigger.takeIf { "Otro" in triggers }))
+            .distinctBy { it.lowercase().trim() }
             .take(8)
-        val safeCopingActions = copingActions
-            .filter { it in ALLOWED_COPING_ACTIONS }
+        val safeCopingActions = (copingActions.filter { it in ALLOWED_COPING_ACTIONS } +
+            listOfNotNull(cleanOtherCopingAction.takeIf { "Otro" in copingActions }))
+            .distinctBy { it.lowercase().trim() }
             .take(8)
         val safeNote = note
             .filterNot { it.isISOControl() }
-            .replace("<", "")
-            .replace(">", "")
             .trim()
             .take(1000)
 
@@ -261,6 +265,10 @@ class EmotionalCheckinViewModel(
             energyValue == null -> "Selecciona un nivel de energía válido."
             sleepQualityValue == null -> "Selecciona cómo dormiste."
             keptSobriety == null -> "Indica si mantuviste tu sobriedad."
+            "Otro" in triggers && cleanOtherTrigger.isNullOrBlank() ->
+                "Escribe el otro detonante (máximo 120 caracteres)."
+            "Otro" in copingActions && cleanOtherCopingAction.isNullOrBlank() ->
+                "Escribe la otra acción de afrontamiento (máximo 120 caracteres)."
             else -> null
         }
 
@@ -277,11 +285,16 @@ class EmotionalCheckinViewModel(
             energyLevel = energyValue!! * 2,
             sleepQuality = sleepQualityValue!! * 2,
             hadRelapse = !keptSobriety!!,
-            triggers = safeTriggers,
-            copingActions = safeCopingActions,
+            triggers = safeTriggers.filterNot { it == "Otro" },
+            copingActions = safeCopingActions.filterNot { it == "Otro" },
             noteText = safeNote,
         )
     }
+
+    private fun String.cleanFreeText(maxLength: Int): String? =
+        filterNot { it.isISOControl() }
+            .trim()
+            .takeIf { it.isNotBlank() && it.length <= maxLength && !it.equals("Otro", ignoreCase = true) }
 
     private fun String.toMoodScore(): Int {
         return when (this) {
@@ -305,8 +318,8 @@ class EmotionalCheckinViewModel(
 
     private companion object {
         val ALLOWED_MOODS = setOf("Muy bajo", "Bajo", "Neutral", "Bueno")
-        val ALLOWED_TRIGGERS = setOf("Estrés", "Soledad", "Presión social", "Tristeza")
-        val ALLOWED_COPING_ACTIONS = setOf("Respiración", "Llamar apoyo", "Caminar", "Reunión")
+        val ALLOWED_TRIGGERS = setOf("Estrés", "Soledad", "Presión social", "Tristeza", "Otro")
+        val ALLOWED_COPING_ACTIONS = setOf("Respiración", "Llamar apoyo", "Caminar", "Reunión", "Otro")
     }
 }
 
@@ -697,6 +710,27 @@ class AgendaViewModel(
 
     fun cancelEvent(eventId: String) {
         updateStatus(eventId, "cancelled")
+    }
+
+    fun reportAttendance(eventId: String, attended: Boolean) {
+        viewModelScope.launch {
+            val previousState = _uiState.value
+            when (val result = repository.updateAgendaEventAttendance(eventId, attended)) {
+                is PatientDataResult.Success -> {
+                    invalidatePatientRefreshes()
+                    refreshIfStale(force = true)
+                }
+                is PatientDataResult.Failure -> {
+                    if (previousState is AgendaEventsUiState.Content) {
+                        _uiState.value = previousState.copy(
+                            offlineStatus = previousState.offlineStatus.copy(warning = result.message),
+                        )
+                    } else {
+                        _uiState.value = AgendaEventsUiState.Error(result.message)
+                    }
+                }
+            }
+        }
     }
 
     private fun updateStatus(
@@ -1133,7 +1167,11 @@ class PatientProfileViewModel(
         viewModelScope.launch {
             _profileActionState.value = FormSaveUiState.Loading
             _profileActionState.value = when (
-                val result = repository.updateOwnProfile(profile.fullName, profile.phone)
+                val result = repository.updateOwnProfile(
+                    profile.fullName,
+                    profile.phone,
+                    profile.sobrietyStartDate,
+                )
             ) {
                 is PatientDataResult.Success -> {
                     invalidatePatientRefreshes()

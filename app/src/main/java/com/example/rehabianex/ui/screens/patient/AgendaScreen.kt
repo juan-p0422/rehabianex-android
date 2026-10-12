@@ -60,6 +60,7 @@ fun AgendaScreen(
     onRetry: () -> Unit,
     onCompleteEvent: (AgendaEvent) -> Unit,
     onCancelEvent: (AgendaEvent) -> Unit,
+    onReportAttendance: (AgendaEvent, Boolean) -> Unit,
 ) {
     var visibleMonthText by rememberSaveable { mutableStateOf(YearMonth.now().toString()) }
     val visibleMonth = YearMonth.parse(visibleMonthText)
@@ -100,6 +101,7 @@ fun AgendaScreen(
                     visibleMonth = visibleMonth,
                     onCompleteEvent = onCompleteEvent,
                     onCancelEvent = onCancelEvent,
+                    onReportAttendance = onReportAttendance,
                 )
             }
         }
@@ -313,6 +315,7 @@ private fun AgendaContent(
     visibleMonth: YearMonth,
     onCompleteEvent: (AgendaEvent) -> Unit,
     onCancelEvent: (AgendaEvent) -> Unit,
+    onReportAttendance: (AgendaEvent, Boolean) -> Unit,
 ) {
     if (events.isEmpty()) {
         RehabianexCard {
@@ -331,6 +334,7 @@ private fun AgendaContent(
             event = event,
             onCompleteEvent = onCompleteEvent,
             onCancelEvent = onCancelEvent,
+            onReportAttendance = onReportAttendance,
         )
         if (index != events.lastIndex) {
             Spacer(Modifier.height(10.dp))
@@ -364,6 +368,7 @@ private fun AgendaEventCard(
     event: AgendaEvent,
     onCompleteEvent: (AgendaEvent) -> Unit,
     onCancelEvent: (AgendaEvent) -> Unit,
+    onReportAttendance: (AgendaEvent, Boolean) -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -385,10 +390,28 @@ private fun AgendaEventCard(
                 Spacer(Modifier.height(4.dp))
                 Text("${event.typeLabel} · ${event.timeText}", color = RehabianexColors.GrayText)
                 Text(event.detail, color = RehabianexColors.GrayText)
+                Text(
+                    text = when (event.status) {
+                        "completed" -> "Estado: completado"
+                        "cancelled" -> "Estado: cancelado"
+                        else -> "Estado: agendado"
+                    },
+                    color = RehabianexColors.GrayText,
+                )
+                if (event.status == "completed") {
+                    Text(
+                        text = when (event.attendanceReported) {
+                            true -> "Asistencia autorreportada: asistí"
+                            false -> "Asistencia autorreportada: no asistí"
+                            null -> "Asistencia autorreportada: sin responder"
+                        },
+                        color = RehabianexColors.GrayText,
+                    )
+                }
             }
         }
         Spacer(Modifier.height(10.dp))
-        Row(
+        if (event.status == "scheduled") Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -417,6 +440,21 @@ private fun AgendaEventCard(
                     "Evento cancelado. El aviso fue retirado.",
                     Toast.LENGTH_SHORT,
                 ).show()
+            }
+        }
+        if (event.status == "completed") {
+            Text("¿Asististe? Esta respuesta es tu autorreporte.", fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                RehabianexOutlineButton("Sí, asistí", Modifier.weight(1f)) {
+                    onReportAttendance(event, true)
+                }
+                RehabianexOutlineButton("No asistí", Modifier.weight(1f)) {
+                    onReportAttendance(event, false)
+                }
             }
         }
     }

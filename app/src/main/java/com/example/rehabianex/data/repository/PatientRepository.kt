@@ -35,6 +35,7 @@ import com.example.rehabianex.data.model.CreateSupportContactRequest
 import com.example.rehabianex.data.model.LocalResource
 import com.example.rehabianex.data.model.LocalResourceDto
 import com.example.rehabianex.data.model.MetricsData
+import com.example.rehabianex.data.model.MetricsPeriodData
 import com.example.rehabianex.data.model.NotificationSettingsData
 import com.example.rehabianex.data.model.NotificationSettingsDto
 import com.example.rehabianex.data.model.OfflineStatus
@@ -544,7 +545,7 @@ class PatientRepository(
         val response = authorizedCall {
             apiService.updateAgendaEvent(
                 eventId = cleanEventId,
-                request = UpdateAgendaEventRequest(cleanStatus),
+                request = UpdateAgendaEventRequest(status = cleanStatus),
             )
         }
 
@@ -556,6 +557,28 @@ class PatientRepository(
             throw EarlyFailureException(
                 response.toPatientFailure(),
             )
+        }
+    }
+
+
+    suspend fun updateAgendaEventAttendance(
+        eventId: String,
+        attended: Boolean,
+    ): PatientDataResult<String> = safeRequest(
+        defaultUnexpectedMessage = "Ocurrió un error inesperado al actualizar la asistencia.",
+    ) {
+        val cleanEventId = eventId.safeResourceId("evento")
+        val response = authorizedCall {
+            apiService.updateAgendaEvent(
+                eventId = cleanEventId,
+                request = UpdateAgendaEventRequest(attendanceReported = attended),
+            )
+        }
+        if (response.isSuccessful) {
+            response.body()?.data?.let { cacheAgenda(sessionUid(), listOf(it)) }
+            response.body()?.message.cleanText() ?: "Asistencia autorreportada actualizada."
+        } else {
+            throw EarlyFailureException(response.toPatientFailure())
         }
     }
 
@@ -941,6 +964,7 @@ class PatientRepository(
     suspend fun updateOwnProfile(
         fullName: String,
         phone: String,
+        sobrietyStartDate: String? = null,
     ): PatientDataResult<String> {
         if (networkStatusProvider?.isOnline() == false) {
             return PatientDataResult.Failure(
@@ -957,6 +981,7 @@ class PatientRepository(
                     request = UpdatePatientRequest(
                         fullName = fullName,
                         phone = phone,
+                        sobrietyStartDate = sobrietyStartDate,
                     ),
                 )
             }
@@ -969,6 +994,7 @@ class PatientRepository(
                 role = "patient",
                 fullName = fullName,
                 phone = phone,
+                sobrietyStartDate = sobrietyStartDate,
                 email = sessionManager.getEmail(),
             )
             cacheProfile(profile)
@@ -1606,20 +1632,41 @@ class PatientRepository(
         profile: SessionProfileDto?,
         notes: List<PatientNoteDto>,
     ): MetricsData {
-        val recentNotes = notes.take(7)
+        val today = LocalDate.now(ZoneId.systemDefault())
+        val weekStart = today.minusDays(6)
+        val monthStart = today.withDayOfMonth(1)
         return MetricsData(
             soberDays = profile.soberDaysText(),
-            weeklyAnxiety = recentNotes.averageScale5 { anxietyLevel },
-            weeklyCraving = recentNotes.averageScale5 { cravingLevel },
-            averageEnergy = recentNotes.averageScale5 { energyLevel },
-            averageSleep = recentNotes.averageScale5 { sleepQuality },
-            predominantMood = recentNotes.predominantMood(),
-            chartValues = recentNotes.take(5).reversed()
-                .map { ((it.anxietyLevel ?: 0).coerceIn(0, 10) / 10f) },
-            insight = recentNotes.insight(),
-            recordsCount = recentNotes.size,
-            relapseCount = recentNotes.count { it.hadRelapse == true },
-            riskSummary = recentNotes.riskSummary(),
+            weekly = notes.metricsForPeriod("Últimos 7 días", weekStart, today),
+            monthly = notes.metricsForPeriod("Mes actual", monthStart, today),
+        )
+    }
+
+    private fun List<PatientNoteDto>.metricsForPeriod(
+        label: String,
+        start: LocalDate,
+        end: LocalDate,
+    ): MetricsPeriodData {
+        val periodNotes = filter { note ->
+            note.createdAt?.toLocalDateOrNull()?.let { date ->
+                !date.isBefore(start) && !date.isAfter(end)
+            } == true
+        }
+        val rangeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+        return MetricsPeriodData(
+            label = label,
+            dateRange = "${start.format(rangeFormatter)} – ${end.format(rangeFormatter)}",
+            anxiety = periodNotes.averageScale5 { anxietyLevel },
+            craving = periodNotes.averageScale5 { cravingLevel },
+            averageEnergy = periodNotes.averageScale5 { energyLevel },
+            averageSleep = periodNotes.averageScale5 { sleepQuality },
+            predominantMood = periodNotes.predominantMood(),
+            chartValues = periodNotes.asReversed()
+                .mapNotNull { it.anxietyLevel?.coerceIn(0, 10)?.div(10f) },
+            insight = periodNotes.insight(),
+            recordsCount = periodNotes.size,
+            relapseCount = periodNotes.count { it.hadRelapse == true },
+            riskSummary = periodNotes.riskSummary(),
         )
     }
 
@@ -1930,10 +1977,10 @@ class PatientRepository(
     private fun List<PatientNoteDto>.averageScale5(
         valueSelector: PatientNoteDto.() -> Int?,
     ): String {
-        if (isEmpty()) return "0/5"
+        if (isEmpty()) return "Sin respuesta"
 
         val values = mapNotNull { it.valueSelector() }
-        if (values.isEmpty()) return "0/5"
+        if (values.isEmpty()) return "Sin respuesta"
 
         val average = values.average()
         return "${(average / 2).roundToInt().coerceIn(0, 5)}/5"
@@ -1967,14 +2014,15 @@ class PatientRepository(
     private fun List<PatientNoteDto>.riskSummary(): String {
         if (isEmpty()) return "Sin datos suficientes"
 
-        val averageAnxiety = mapNotNull { it.anxietyLevel }.averageOrZero()
-        val averageCraving = mapNotNull { it.cravingLevel }.averageOrZero()
+        val anxietyValues = mapNotNull { it.anxietyLevel }
+        val cravingValues = mapNotNull { it.cravingLevel }
         val relapseCount = count { it.hadRelapse == true }
 
         return when {
             relapseCount > 0 -> "Atención: hubo recaída registrada"
-            averageAnxiety >= 7 || averageCraving >= 7 -> "Riesgo alto"
-            averageAnxiety >= 4 || averageCraving >= 4 -> "Riesgo moderado"
+            anxietyValues.isEmpty() && cravingValues.isEmpty() -> "Sin datos suficientes"
+            anxietyValues.averageOrZero() >= 7 || cravingValues.averageOrZero() >= 7 -> "Riesgo alto"
+            anxietyValues.averageOrZero() >= 4 || cravingValues.averageOrZero() >= 4 -> "Riesgo moderado"
             else -> "Riesgo bajo"
         }
     }
@@ -2114,6 +2162,8 @@ class PatientRepository(
             dateLabel = startsAtDate?.format(DateLabelFormatter) ?: "Sin fecha",
             dayNumber = startsAtDate?.dayOfMonth ?: 0,
             typeLabel = type.cleanText()?.typeLabel() ?: "Evento",
+            status = status.cleanText()?.lowercase() ?: "scheduled",
+            attendanceReported = attendanceReported,
         )
     }
 
@@ -2332,6 +2382,9 @@ class PatientRepository(
         return runCatching {
             OffsetDateTime.parse(this).atZoneSameInstant(ZoneId.systemDefault()).toLocalDate()
         }.getOrNull()
+            ?: runCatching {
+                ZonedDateTime.parse(this).withZoneSameInstant(ZoneId.systemDefault()).toLocalDate()
+            }.getOrNull()
             ?: runCatching { LocalDateTime.parse(this).toLocalDate() }.getOrNull()
             ?: runCatching { LocalDate.parse(this) }.getOrNull()
     }

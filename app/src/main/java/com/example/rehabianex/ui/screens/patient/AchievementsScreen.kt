@@ -50,6 +50,11 @@ fun AchievementsScreen(
 @Composable
 private fun AchievementsContent(data: AchievementsData) {
     MetricCard("Días consecutivos sobrio", data.soberDays)
+    Spacer(Modifier.height(10.dp))
+    SoftCard {
+        Text("Próximo logro", fontWeight = FontWeight.Bold)
+        Text(data.nextHint)
+    }
     Spacer(Modifier.height(16.dp))
     Text("Logros de sobriedad", fontWeight = FontWeight.Bold)
     Spacer(Modifier.height(10.dp))
@@ -57,11 +62,6 @@ private fun AchievementsContent(data: AchievementsData) {
     data.achievements.forEach { achievement ->
         AchievementCard(achievement = achievement)
         Spacer(Modifier.height(10.dp))
-    }
-
-    Spacer(Modifier.height(6.dp))
-    SoftCard {
-        Text(data.nextHint)
     }
 }
 

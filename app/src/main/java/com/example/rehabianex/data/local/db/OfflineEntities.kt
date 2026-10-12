@@ -66,6 +66,8 @@ data class AgendaEventEntity(
     val endsAt: String?,
     val location: String?,
     val status: String?,
+    val attendanceReported: Boolean? = null,
+    val attendanceReportedAt: String? = null,
     val notes: String?,
     val createdAt: String?,
     val updatedAt: String?,

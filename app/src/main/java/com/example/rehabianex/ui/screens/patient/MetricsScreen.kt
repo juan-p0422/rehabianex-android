@@ -12,13 +12,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.rehabianex.data.model.MetricsData
+import com.example.rehabianex.data.model.MetricsPeriodData
 import com.example.rehabianex.navigation.Routes
 import com.example.rehabianex.ui.components.DangerCard
+import com.example.rehabianex.ui.components.ChipSelector
 import com.example.rehabianex.ui.components.LabelValueCard
 import com.example.rehabianex.ui.components.MetricCard
 import com.example.rehabianex.ui.components.OfflineStatusCard
@@ -53,21 +59,33 @@ fun MetricsScreen(
 
 @Composable
 private fun MetricsContent(data: MetricsData) {
+    var selectedPeriod by rememberSaveable { mutableStateOf("7 días") }
+    val period: MetricsPeriodData = if (selectedPeriod == "Mes") data.monthly else data.weekly
     MetricCard("Días consecutivos sobrio", data.soberDays)
+    Spacer(Modifier.height(12.dp))
+    RehabianexCard {
+        Text("Periodo", fontWeight = FontWeight.Bold)
+        ChipSelector(
+            options = listOf("7 días", "Mes"),
+            selected = selectedPeriod,
+            onSelected = { selectedPeriod = it },
+        )
+        Text("${period.label}: ${period.dateRange}", color = RehabianexColors.GrayText)
+    }
     Spacer(Modifier.height(12.dp))
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         LabelValueCard(
-            "Ansiedad semanal",
-            data.weeklyAnxiety,
+            "Ansiedad autorreportada",
+            period.anxiety,
             Modifier.weight(1f),
             RehabianexColors.WarningBg,
         )
         LabelValueCard(
-            "Craving semanal",
-            data.weeklyCraving,
+            "Craving autorreportado",
+            period.craving,
             Modifier.weight(1f),
             RehabianexColors.WarningBg,
         )
@@ -79,13 +97,13 @@ private fun MetricsContent(data: MetricsData) {
     ) {
         LabelValueCard(
             "Energía promedio",
-            data.averageEnergy,
+            period.averageEnergy,
             Modifier.weight(1f),
             RehabianexColors.GreenSoft,
         )
         LabelValueCard(
             "Sueño promedio",
-            data.averageSleep,
+            period.averageSleep,
             Modifier.weight(1f),
             RehabianexColors.GreenSoft,
         )
@@ -93,34 +111,39 @@ private fun MetricsContent(data: MetricsData) {
     Spacer(Modifier.height(12.dp))
     SoftCard {
         Text("Ánimo predominante", fontWeight = FontWeight.Bold)
-        Text(data.predominantMood)
+        Text(period.predominantMood)
         Spacer(Modifier.height(6.dp))
-        Text("Registros analizados: ${data.recordsCount}")
-        Text("Recaídas registradas: ${data.relapseCount}")
-        Text(data.riskSummary, fontWeight = FontWeight.Bold)
+        Text("Registros del periodo: ${period.recordsCount}")
+        Text("Recaídas autorreportadas: ${period.relapseCount}")
+        Text(period.riskSummary, fontWeight = FontWeight.Bold)
     }
     Spacer(Modifier.height(12.dp))
     RehabianexCard {
-        Text("Tendencia semanal", fontWeight = FontWeight.Bold)
+        Text("Tendencia del periodo", fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
-        if (data.chartValues.isEmpty()) {
+        if (period.chartValues.isEmpty()) {
             Text("Aún no hay registros para graficar.", color = RehabianexColors.GrayText)
         } else {
-            SimpleBarChart(data.chartValues)
+            SimpleBarChart(period.chartValues)
             Spacer(Modifier.height(10.dp))
             ChartLegend()
         }
     }
     Spacer(Modifier.height(12.dp))
-    if (data.insight == null) {
+    if (period.insight == null) {
         SoftCard {
             Text("Aún no hay registros emocionales.")
         }
     } else {
         WarningCard {
-            Text(data.insight)
+            Text(period.insight)
         }
     }
+    Spacer(Modifier.height(12.dp))
+    Text(
+        "Estas métricas resumen tus autorreportes personales; no miden eficacia clínica ni sustituyen una evaluación profesional.",
+        color = RehabianexColors.GrayText,
+    )
 }
 
 @Composable

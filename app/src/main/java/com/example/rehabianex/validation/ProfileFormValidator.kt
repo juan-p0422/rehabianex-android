@@ -1,6 +1,7 @@
 package com.example.rehabianex.validation
 
 import java.util.Locale
+import java.time.LocalDate
 
 data class EditableProfileFormInput(
     val fullName: String,
@@ -8,6 +9,7 @@ data class EditableProfileFormInput(
     val phoneRegion: String,
     val supervisorType: String? = null,
     val supervisorTypeOther: String = "",
+    val sobrietyStartDate: String? = null,
 )
 
 data class EditableProfileValue(
@@ -15,6 +17,7 @@ data class EditableProfileValue(
     val phone: String,
     val supervisorType: String? = null,
     val supervisorTypeOther: String? = null,
+    val sobrietyStartDate: String? = null,
 )
 
 object ProfileFormValidator {
@@ -28,6 +31,16 @@ object ProfileFormValidator {
 
         val phone = PhoneNumberValidator.validate(input.phoneRegion, input.phone)
         phone.error?.let { errors["phone"] = it }
+        val sobrietyStartDate = input.sobrietyStartDate?.trim()?.takeIf { it.isNotEmpty() }
+        if (input.sobrietyStartDate != null && sobrietyStartDate == null) {
+            errors["sobrietyStartDate"] = "Ingresa la fecha de sobriedad."
+        } else if (sobrietyStartDate != null) {
+            val parsed = runCatching { LocalDate.parse(sobrietyStartDate) }.getOrNull()
+            when {
+                parsed == null -> errors["sobrietyStartDate"] = "Usa una fecha válida con formato AAAA-MM-DD."
+                parsed.isAfter(LocalDate.now()) -> errors["sobrietyStartDate"] = "La fecha de sobriedad no puede estar en el futuro."
+            }
+        }
 
         val supervisorType = if (includeSupervisorType) {
             normalizeSupervisorType(input, errors)
@@ -42,6 +55,7 @@ object ProfileFormValidator {
                     phone = checkNotNull(phone.value),
                     supervisorType = supervisorType.first,
                     supervisorTypeOther = supervisorType.second,
+                    sobrietyStartDate = sobrietyStartDate,
                 ),
             )
         } else {

@@ -87,6 +87,8 @@ class OfflineDaosInstrumentedTest {
                     endsAt = null,
                     location = null,
                     status = "completed",
+                    attendanceReported = true,
+                    attendanceReportedAt = "2026-08-01T20:00:00-06:00",
                     notes = null,
                     createdAt = null,
                     updatedAt = null,
@@ -97,7 +99,9 @@ class OfflineDaosInstrumentedTest {
         )
 
         assertEquals(1, database.patientNoteDao().pendingCount("patient-a"))
-        assertEquals(listOf("event-1"), database.agendaEventDao().activeForOwner("patient-a").map { it.serverId })
+        val agenda = database.agendaEventDao().activeForOwner("patient-a")
+        assertEquals(listOf("event-2", "event-1"), agenda.map { it.serverId })
+        assertTrue(agenda.first { it.serverId == "event-2" }.attendanceReported == true)
         assertTrue(database.patientNoteDao().readyForSync("patient-b").isEmpty())
     }
 

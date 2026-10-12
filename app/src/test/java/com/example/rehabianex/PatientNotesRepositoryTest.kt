@@ -11,7 +11,10 @@ import com.example.rehabianex.data.repository.PatientDataResult
 import com.example.rehabianex.data.repository.PatientRepository
 import java.lang.reflect.Proxy
 import java.time.OffsetDateTime
+import java.time.LocalDate
+import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.util.TimeZone
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -111,6 +114,92 @@ class PatientNotesRepositoryTest {
         assertEquals(1, metrics.relapseCount)
         assertEquals(listOf(0.6f, 0.8f), metrics.chartValues)
         assertEquals("Atención: hubo recaída registrada", metrics.riskSummary)
+    }
+
+    @Test
+    fun patientMetrics_weekMeansSevenCalendarDaysNotSevenRecords() = runTest {
+        val now = OffsetDateTime.now()
+        val notes = (1..9).map { index ->
+            PatientNoteDto(
+                noteId = "same-day-$index",
+                patientUid = PATIENT_UID,
+                mood = "tranquilo",
+                anxietyLevel = 2,
+                cravingLevel = 0,
+                energyLevel = 6,
+                sleepQuality = 6,
+                hadRelapse = false,
+                createdAt = now.minusHours(index.toLong()).toString(),
+            )
+        }
+        val repository = repositoryWithNotes(
+            Response.success(PatientNotesResponse(patientUid = PATIENT_UID, notes = notes)),
+        )
+
+        val metrics = (repository.loadMetricsData() as PatientDataResult.Success).data
+
+        assertEquals(9, metrics.weekly.recordsCount)
+        assertTrue(metrics.weekly.dateRange.contains("–"))
+    }
+
+    @Test
+    fun patientMetrics_doesNotConvertMissingScaleToZero() = runTest {
+        val note = PatientNoteDto(
+            noteId = "missing-scales",
+            patientUid = PATIENT_UID,
+            mood = "neutral",
+            anxietyLevel = null,
+            cravingLevel = null,
+            createdAt = OffsetDateTime.now().toString(),
+        )
+        val repository = repositoryWithNotes(
+            Response.success(PatientNotesResponse(patientUid = PATIENT_UID, notes = listOf(note))),
+        )
+
+        val metrics = (repository.loadMetricsData() as PatientDataResult.Success).data
+
+        assertEquals("Sin respuesta", metrics.weekly.anxiety)
+        assertEquals("Sin respuesta", metrics.weekly.craving)
+        assertTrue(metrics.weekly.chartValues.isEmpty())
+        assertEquals("Sin datos suficientes", metrics.weekly.riskSummary)
+    }
+
+    @Test
+    fun patientMetrics_usesInclusiveSevenDayBoundaryInMexicoTimezone() = runTest {
+        val originalZone = TimeZone.getDefault()
+        val mexicoZone = ZoneId.of("America/Mexico_City")
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone(mexicoZone))
+            val today = LocalDate.now(mexicoZone)
+            fun note(id: String, daysAgo: Long) = PatientNoteDto(
+                noteId = id,
+                patientUid = PATIENT_UID,
+                mood = "neutral",
+                anxietyLevel = 0,
+                cravingLevel = 0,
+                createdAt = today.minusDays(daysAgo)
+                    .atTime(23, 30)
+                    .atZone(mexicoZone)
+                    .withZoneSameInstant(ZoneId.of("UTC"))
+                    .toOffsetDateTime()
+                    .toString(),
+            )
+            val repository = repositoryWithNotes(
+                Response.success(
+                    PatientNotesResponse(
+                        patientUid = PATIENT_UID,
+                        notes = listOf(note("included", 6), note("excluded", 7)),
+                    ),
+                ),
+            )
+
+            val metrics = (repository.loadMetricsData() as PatientDataResult.Success).data
+
+            assertEquals(1, metrics.weekly.recordsCount)
+            assertEquals("0/5", metrics.weekly.anxiety)
+        } finally {
+            TimeZone.setDefault(originalZone)
+        }
     }
 
     @Test

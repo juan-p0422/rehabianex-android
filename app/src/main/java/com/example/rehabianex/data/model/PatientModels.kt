@@ -442,6 +442,10 @@ data class AgendaEventDto(
     val endsAt: String? = null,
     val location: String? = null,
     val status: String? = null,
+    @SerializedName("attendance_reported")
+    val attendanceReported: Boolean? = null,
+    @SerializedName("attendance_reported_at")
+    val attendanceReportedAt: String? = null,
     val notes: String? = null,
     @SerializedName("created_at")
     val createdAt: String? = null,
@@ -464,7 +468,9 @@ data class CreateAgendaEventRequest(
 )
 
 data class UpdateAgendaEventRequest(
-    val status: String,
+    val status: String? = null,
+    @SerializedName("attendance_reported")
+    val attendanceReported: Boolean? = null,
 )
 
 data class PatientHomeData(
@@ -526,6 +532,8 @@ data class AgendaEvent(
     val dateLabel: String,
     val dayNumber: Int,
     val typeLabel: String,
+    val status: String,
+    val attendanceReported: Boolean? = null,
 )
 
 data class AchievementDto(
@@ -572,8 +580,26 @@ data class OfflineStatus(
 
 data class MetricsData(
     val soberDays: String,
-    val weeklyAnxiety: String,
-    val weeklyCraving: String,
+    val weekly: MetricsPeriodData,
+    val monthly: MetricsPeriodData,
+) {
+    val weeklyAnxiety: String get() = weekly.anxiety
+    val weeklyCraving: String get() = weekly.craving
+    val averageEnergy: String get() = weekly.averageEnergy
+    val averageSleep: String get() = weekly.averageSleep
+    val predominantMood: String get() = weekly.predominantMood
+    val chartValues: List<Float> get() = weekly.chartValues
+    val insight: String? get() = weekly.insight
+    val recordsCount: Int get() = weekly.recordsCount
+    val relapseCount: Int get() = weekly.relapseCount
+    val riskSummary: String get() = weekly.riskSummary
+}
+
+data class MetricsPeriodData(
+    val label: String,
+    val dateRange: String,
+    val anxiety: String,
+    val craving: String,
     val averageEnergy: String,
     val averageSleep: String,
     val predominantMood: String,

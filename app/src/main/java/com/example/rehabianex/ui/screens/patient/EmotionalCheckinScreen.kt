@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -15,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.example.rehabianex.navigation.Routes
 import com.example.rehabianex.ui.components.ChipSelector
 import com.example.rehabianex.ui.components.DangerCard
+import com.example.rehabianex.ui.components.InputField
 import com.example.rehabianex.ui.components.MultiChipSelector
 import com.example.rehabianex.ui.components.PatientScreenScaffold
 import com.example.rehabianex.ui.components.RehabianexButton
@@ -32,14 +34,16 @@ fun EmotionalCheckinScreen(
     onSave: (DailyNoteFormInput) -> Unit,
     onInputChanged: () -> Unit,
 ) {
-    var mood by rememberSaveable { mutableStateOf("Neutral") }
-    var anxiety by rememberSaveable { mutableStateOf("3") }
-    var craving by rememberSaveable { mutableStateOf("2") }
-    var energy by rememberSaveable { mutableStateOf("3") }
-    var sleepQuality by rememberSaveable { mutableStateOf("3") }
-    var sober by rememberSaveable { mutableStateOf("Sí") }
+    var mood by rememberSaveable { mutableStateOf("") }
+    var anxiety by rememberSaveable { mutableStateOf("") }
+    var craving by rememberSaveable { mutableStateOf("") }
+    var energy by rememberSaveable { mutableStateOf("") }
+    var sleepQuality by rememberSaveable { mutableStateOf("") }
+    var sober by rememberSaveable { mutableStateOf("") }
     var triggers by rememberSaveable { mutableStateOf(setOf<String>()) }
     var copingActions by rememberSaveable { mutableStateOf(setOf<String>()) }
+    var otherTrigger by rememberSaveable { mutableStateOf("") }
+    var otherCopingAction by rememberSaveable { mutableStateOf("") }
     var note by rememberSaveable { mutableStateOf("") }
     val isSaving = saveState is DailyNoteSaveUiState.Loading
 
@@ -47,6 +51,22 @@ fun EmotionalCheckinScreen(
         if (!isSaving) {
             change()
             onInputChanged()
+        }
+    }
+
+    LaunchedEffect(saveState) {
+        if (saveState is DailyNoteSaveUiState.Success) {
+            mood = ""
+            anxiety = ""
+            craving = ""
+            energy = ""
+            sleepQuality = ""
+            sober = ""
+            triggers = emptySet()
+            copingActions = emptySet()
+            otherTrigger = ""
+            otherCopingAction = ""
+            note = ""
         }
     }
 
@@ -67,6 +87,7 @@ fun EmotionalCheckinScreen(
         Spacer(Modifier.height(10.dp))
         RehabianexCard {
             Text("Ansiedad", fontWeight = FontWeight.Bold)
+            Text("Autorreportada: 0 = nada, 5 = muy intensa", color = RehabianexColors.GrayText)
             ChipSelector(
                 options = (0..5).map(Int::toString),
                 selected = anxiety,
@@ -76,6 +97,7 @@ fun EmotionalCheckinScreen(
         Spacer(Modifier.height(10.dp))
         RehabianexCard {
             Text("Craving", fontWeight = FontWeight.Bold)
+            Text("Deseo de consumo autorreportado: 0 = nada, 5 = muy intenso", color = RehabianexColors.GrayText)
             ChipSelector(
                 options = (0..5).map(Int::toString),
                 selected = craving,
@@ -85,6 +107,7 @@ fun EmotionalCheckinScreen(
         Spacer(Modifier.height(10.dp))
         RehabianexCard {
             Text("Energía", fontWeight = FontWeight.Bold)
+            Text("Autorreportada: 0 = sin energía, 5 = energía muy alta", color = RehabianexColors.GrayText)
             ChipSelector(
                 options = (0..5).map(Int::toString),
                 selected = energy,
@@ -94,6 +117,7 @@ fun EmotionalCheckinScreen(
         Spacer(Modifier.height(10.dp))
         RehabianexCard {
             Text("¿Cómo dormiste?", fontWeight = FontWeight.Bold)
+            Text("Calidad autorreportada: 0 = muy mal, 5 = muy bien", color = RehabianexColors.GrayText)
             ChipSelector(
                 options = (0..5).map(Int::toString),
                 selected = sleepQuality,
@@ -113,7 +137,7 @@ fun EmotionalCheckinScreen(
         RehabianexCard {
             Text("Detonantes", fontWeight = FontWeight.Bold)
             MultiChipSelector(
-                options = listOf("Estrés", "Soledad", "Presión social", "Tristeza"),
+                options = listOf("Estrés", "Soledad", "Presión social", "Tristeza", "Otro"),
                 selected = triggers,
                 onToggle = { selected ->
                     updateForm {
@@ -125,12 +149,21 @@ fun EmotionalCheckinScreen(
                     }
                 },
             )
+            if ("Otro" in triggers) {
+                Spacer(Modifier.height(8.dp))
+                InputField(
+                    value = otherTrigger,
+                    onValueChange = { value -> updateForm { otherTrigger = value.take(120) } },
+                    label = "Otro detonante",
+                    enabled = !isSaving,
+                )
+            }
         }
         Spacer(Modifier.height(10.dp))
         RehabianexCard {
             Text("Acciones de afrontamiento", fontWeight = FontWeight.Bold)
             MultiChipSelector(
-                options = listOf("Respiración", "Llamar apoyo", "Caminar", "Reunión"),
+                options = listOf("Respiración", "Llamar apoyo", "Caminar", "Reunión", "Otro"),
                 selected = copingActions,
                 onToggle = { selected ->
                     updateForm {
@@ -142,6 +175,15 @@ fun EmotionalCheckinScreen(
                     }
                 },
             )
+            if ("Otro" in copingActions) {
+                Spacer(Modifier.height(8.dp))
+                InputField(
+                    value = otherCopingAction,
+                    onValueChange = { value -> updateForm { otherCopingAction = value.take(120) } },
+                    label = "Otra acción de afrontamiento",
+                    enabled = !isSaving,
+                )
+            }
         }
         Spacer(Modifier.height(10.dp))
         TextAreaField(
@@ -168,6 +210,8 @@ fun EmotionalCheckinScreen(
                     sober = sober,
                     triggers = triggers,
                     copingActions = copingActions,
+                    otherTrigger = otherTrigger,
+                    otherCopingAction = otherCopingAction,
                     note = note,
                 ),
             )

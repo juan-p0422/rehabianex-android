@@ -134,6 +134,7 @@ internal fun NavGraphBuilder.patientGraph(
             onRetry = viewModel::load,
             onCompleteEvent = { event -> viewModel.completeEvent(event.id) },
             onCancelEvent = { event -> viewModel.cancelEvent(event.id) },
+            onReportAttendance = { event, attended -> viewModel.reportAttendance(event.id, attended) },
         )
     }
     composable(Routes.NewEvent) {

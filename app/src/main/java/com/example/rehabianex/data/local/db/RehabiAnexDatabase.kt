@@ -32,7 +32,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         AdminProfileSnapshotEntity::class,
         AdminDashboardSummaryEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -111,7 +111,7 @@ abstract class RehabiAnexDatabase : RoomDatabase() {
                 databaseName,
             )
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
                 .also { encryptedDatabase ->
                     // Fuerza apertura, validación de clave y migraciones antes de exponer la instancia.
@@ -249,6 +249,13 @@ abstract class RehabiAnexDatabase : RoomDatabase() {
                     )
                     """.trimIndent(),
                 )
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE agenda_events ADD COLUMN attendanceReported INTEGER")
+                db.execSQL("ALTER TABLE agenda_events ADD COLUMN attendanceReportedAt TEXT")
             }
         }
 

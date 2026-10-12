@@ -371,6 +371,10 @@ private fun PatientProfileEditCard(
     }
     var phone by rememberSaveable(profile.phone) { mutableStateOf(initialPhone.number) }
     var phoneRegion by rememberSaveable(profile.phone) { mutableStateOf(initialPhone.region) }
+    var sobrietyStartDate by rememberSaveable(profile.sobrietyStartDate) {
+        mutableStateOf(profile.sobrietyStartDate.orEmpty().take(10))
+    }
+    var confirmSobrietyDateChange by rememberSaveable { mutableStateOf(false) }
     val isSaving = actionState is FormSaveUiState.Loading
     val fieldErrors = (actionState as? FormSaveUiState.Error)?.fieldErrors.orEmpty()
 
@@ -400,6 +404,18 @@ private fun PatientProfileEditCard(
             allowLegacyInternational = true,
         )
         Spacer(Modifier.height(8.dp))
+        InputField(
+            value = sobrietyStartDate,
+            onValueChange = { if (!isSaving) sobrietyStartDate = it.take(10) },
+            label = "Fecha de inicio de sobriedad (AAAA-MM-DD)",
+            errorMessage = fieldErrors["sobrietyStartDate"],
+            enabled = !isSaving,
+        )
+        Text(
+            "Cambiar esta fecha recalcula los días y el progreso de logros; no elimina tus registros anteriores.",
+            color = RehabianexColors.GrayText,
+        )
+        Spacer(Modifier.height(8.dp))
         SoftCard {
             Text("Correo de acceso", fontWeight = FontWeight.Bold)
             Text(profile.email)
@@ -425,14 +441,46 @@ private fun PatientProfileEditCard(
             text = if (isSaving) "Guardando..." else "Guardar datos",
             enabled = !isSaving,
         ) {
-            onSave(
-                EditableProfileFormInput(
-                    fullName = fullName,
-                    phone = phone,
-                    phoneRegion = phoneRegion,
-                ),
-            )
+            if (sobrietyStartDate != profile.sobrietyStartDate.orEmpty().take(10)) {
+                confirmSobrietyDateChange = true
+            } else {
+                onSave(
+                    EditableProfileFormInput(
+                        fullName = fullName,
+                        phone = phone,
+                        phoneRegion = phoneRegion,
+                        sobrietyStartDate = sobrietyStartDate,
+                    ),
+                )
+            }
         }
+    }
+    if (confirmSobrietyDateChange) {
+        AlertDialog(
+            onDismissRequest = { confirmSobrietyDateChange = false },
+            title = { Text("Confirmar fecha de sobriedad") },
+            text = {
+                Text("Se recalcularán tus días y el avance hacia logros. Tus registros emocionales no se borrarán.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmSobrietyDateChange = false
+                        onSave(
+                            EditableProfileFormInput(
+                                fullName = fullName,
+                                phone = phone,
+                                phoneRegion = phoneRegion,
+                                sobrietyStartDate = sobrietyStartDate,
+                            ),
+                        )
+                    },
+                ) { Text("Confirmar cambio") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmSobrietyDateChange = false }) { Text("Cancelar") }
+            },
+        )
     }
 }
 

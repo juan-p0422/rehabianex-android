@@ -60,7 +60,7 @@ interface PatientNoteDao {
 
 @Dao
 interface AgendaEventDao {
-    @Query("SELECT * FROM agenda_events WHERE ownerUid = :ownerUid AND deletedAt IS NULL AND (status IS NULL OR status = 'scheduled') ORDER BY startsAt")
+    @Query("SELECT * FROM agenda_events WHERE ownerUid = :ownerUid AND deletedAt IS NULL ORDER BY startsAt")
     suspend fun activeForOwner(ownerUid: String): List<AgendaEventEntity>
 
     @Query("SELECT serverId FROM agenda_events WHERE ownerUid = :ownerUid")

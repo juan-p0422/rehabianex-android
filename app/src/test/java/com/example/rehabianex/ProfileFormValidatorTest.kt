@@ -10,8 +10,41 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 
 class ProfileFormValidatorTest {
+    @Test
+    fun patientProfile_rejectsFutureSobrietyDate() {
+        val result = ProfileFormValidator.validate(
+            EditableProfileFormInput(
+                fullName = "Paciente Prueba",
+                phone = "5512345678",
+                phoneRegion = PHONE_REGION_MEXICO,
+                sobrietyStartDate = LocalDate.now().plusDays(1).toString(),
+            ),
+            includeSupervisorType = false,
+        )
+
+        assertEquals(
+            "La fecha de sobriedad no puede estar en el futuro.",
+            result.fieldErrors["sobrietyStartDate"],
+        )
+    }
+
+    @Test
+    fun patientProfile_rejectsClearingSobrietyDate() {
+        val result = ProfileFormValidator.validate(
+            EditableProfileFormInput(
+                fullName = "Paciente Prueba",
+                phone = "5512345678",
+                phoneRegion = PHONE_REGION_MEXICO,
+                sobrietyStartDate = "   ",
+            ),
+            includeSupervisorType = false,
+        )
+
+        assertEquals("Ingresa la fecha de sobriedad.", result.fieldErrors["sobrietyStartDate"])
+    }
     @Test
     fun `form option codes match the backend contract`() {
         assertTrue(SUPERVISOR_TYPE_OPTIONS.keys.containsAll(
