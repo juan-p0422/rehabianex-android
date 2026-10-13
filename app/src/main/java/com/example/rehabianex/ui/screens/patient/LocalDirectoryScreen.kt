@@ -30,6 +30,8 @@ import com.example.rehabianex.ui.components.RehabianexSecondaryButton
 import com.example.rehabianex.ui.components.ScreenHeader
 import com.example.rehabianex.ui.components.WarningCard
 import com.example.rehabianex.ui.theme.RehabianexColors
+import java.text.DateFormat
+import java.util.Date
 
 @Composable
 fun LocalDirectoryScreen(
@@ -41,7 +43,7 @@ fun LocalDirectoryScreen(
     var filter by rememberSaveable { mutableStateOf("Todos") }
 
     PatientScreenScaffold(Routes.LocalDirectory, onNavigate) {
-        ScreenHeader("Directorio local", "Recursos de apoyo verificados")
+        ScreenHeader("Directorio local", "Recursos informativos de apoyo")
         Spacer(Modifier.height(12.dp))
         InputField(query, { query = it.take(100) }, "Buscar recurso")
         Spacer(Modifier.height(8.dp))
@@ -57,6 +59,13 @@ fun LocalDirectoryScreen(
             is LocalResourcesUiState.Error -> DirectoryError(uiState.message, onRetry)
             is LocalResourcesUiState.Content -> {
                 OfflineStatusCard(uiState.offlineStatus)
+                uiState.offlineStatus.lastSyncedAt?.let { syncedAt ->
+                    Text(
+                        "Última sincronización del directorio: ${DateFormat.getDateTimeInstance().format(Date(syncedAt))}",
+                        color = RehabianexColors.GrayText,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
                 DirectoryContent(
                     resources = uiState.resources.filteredBy(query, filter),
                 )
@@ -65,7 +74,11 @@ fun LocalDirectoryScreen(
 
         Spacer(Modifier.height(12.dp))
         WarningCard {
-            Text("Los recursos deben verificarse periódicamente.")
+            Text("Revisión informativa", fontWeight = FontWeight.Bold)
+            Text(
+                "La fuente y la fecha indican revisión de datos informativos; " +
+                    "no constituyen acreditación ni evaluación de calidad clínica.",
+            )
         }
     }
 }
@@ -122,8 +135,16 @@ private fun ResourceCard(resource: LocalResource) {
         Spacer(Modifier.height(4.dp))
         Text(resource.typeLabel, color = RehabianexColors.GreenDark)
         Spacer(Modifier.height(4.dp))
-        Text(resource.detail, color = RehabianexColors.GrayText)
-        Text(resource.city, color = RehabianexColors.GrayText)
+        Text("Detalles: ${resource.detail.ifBlank { "No disponible" }}", color = RehabianexColors.GrayText)
+        Text("Ciudad: ${resource.city.ifBlank { "No disponible" }}", color = RehabianexColors.GrayText)
+        Text("Fuente: ${resource.sourceName.ifBlank { "No disponible" }}", color = RehabianexColors.GrayText)
+        Text("Enlace de fuente: ${resource.sourceUrl.ifBlank { "No disponible" }}", color = RehabianexColors.GrayText)
+        Text("Fecha de revisión: ${resource.reviewedAt.ifBlank { "No disponible" }}", color = RehabianexColors.GrayText)
+        Text("Última actualización técnica: ${resource.updatedAt.ifBlank { "No disponible" }}", color = RehabianexColors.GrayText)
+        Text(
+            "Teléfono: ${resource.phone.ifBlank { "No disponible" }}",
+            color = RehabianexColors.GrayText,
+        )
         if (resource.phone.isNotBlank()) {
             Spacer(Modifier.height(8.dp))
             RehabianexSecondaryButton("Contactar recurso") {

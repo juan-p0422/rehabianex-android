@@ -36,6 +36,7 @@ import com.example.rehabianex.notifications.AgendaNotificationHelper
 import com.example.rehabianex.ui.components.ChipSelector
 import com.example.rehabianex.ui.components.DangerCard
 import com.example.rehabianex.ui.components.OfflineStatusCard
+import com.example.rehabianex.ui.components.NotificationPermissionBanner
 import com.example.rehabianex.ui.components.PatientScreenScaffold
 import com.example.rehabianex.ui.components.RehabianexButton
 import com.example.rehabianex.ui.components.RehabianexCard
@@ -68,6 +69,7 @@ fun AgendaScreen(
     PatientScreenScaffold(Routes.Agenda, onNavigate) {
         ScreenHeader("Mi Agenda", "Reuniones y recordatorios")
         Spacer(Modifier.height(12.dp))
+        NotificationPermissionBanner()
 
         when (uiState) {
             AgendaEventsUiState.Loading -> AgendaLoading()
@@ -258,7 +260,11 @@ private fun AgendaNotificationCard(
     val periodEvents = allEvents.eventsForPeriod(selectedPeriod)
 
     SoftCard {
-        Text("Notificaciones de agenda", fontWeight = FontWeight.Bold)
+        Text("Recordatorios locales de agenda", fontWeight = FontWeight.Bold)
+        Text(
+            "Se programan en este dispositivo. No son alertas automáticas ni mensajes enviados a contactos.",
+            color = RehabianexColors.GrayText,
+        )
         Spacer(Modifier.height(6.dp))
         ChipSelector(
             options = AgendaPeriod.entries.map { it.label },

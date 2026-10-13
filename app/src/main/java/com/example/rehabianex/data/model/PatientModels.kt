@@ -427,6 +427,20 @@ data class CreateSupportContactRequest(
     val relationshipOther: String? = null,
 )
 
+data class UpdateSupportContactRequest(
+    val name: String,
+    val relationship: String,
+    val phone: String,
+    val priority: Int? = null,
+    @SerializedName("can_receive_alerts")
+    val canReceiveAlerts: Boolean,
+    val notes: String? = null,
+    @SerializedName("relationship_category")
+    val relationshipCategory: String = "other",
+    @SerializedName("relationship_other")
+    val relationshipOther: String? = null,
+)
+
 data class AgendaEventDto(
     @SerializedName("document_id")
     val documentId: String? = null,
@@ -503,6 +517,12 @@ data class LocalResourceDto(
     @SerializedName("meeting_schedule")
     val meetingSchedule: List<String>? = null,
     val tags: List<String>? = null,
+    @SerializedName("source_name")
+    val sourceName: String? = null,
+    @SerializedName("source_url")
+    val sourceUrl: String? = null,
+    @SerializedName("reviewed_at")
+    val reviewedAt: String? = null,
     @SerializedName("created_at")
     val createdAt: String? = null,
     @SerializedName("updated_at")
@@ -519,6 +539,10 @@ data class LocalResource(
     val city: String,
     val detail: String,
     val phone: String,
+    val sourceName: String,
+    val sourceUrl: String,
+    val reviewedAt: String,
+    val updatedAt: String,
 )
 
 data class AgendaEvent(

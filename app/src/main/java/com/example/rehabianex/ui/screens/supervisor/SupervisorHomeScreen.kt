@@ -64,7 +64,6 @@ fun SupervisorHomeScreen(
                     items = listOf(
                         HomeMenuItem("Perfil", Routes.SupervisorProfile, R.drawable.ic_nav_patients),
                         HomeMenuItem("Notificaciones", Routes.SupervisorNotifications, R.drawable.ic_nav_alerts),
-                        HomeMenuItem("Demostración FCM", Routes.FcmDemo, R.drawable.ic_nav_alerts),
                     ),
                     onNavigate = onNavigate,
                 )

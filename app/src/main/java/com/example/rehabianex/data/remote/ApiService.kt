@@ -43,6 +43,7 @@ import com.example.rehabianex.data.model.UpdateConsentRequest
 import com.example.rehabianex.data.model.UpdatePatientRequest
 import com.example.rehabianex.data.model.UpdateSupervisionRequest
 import com.example.rehabianex.data.model.UpdateSupervisorRequest
+import com.example.rehabianex.data.model.UpdateSupportContactRequest
 import com.example.rehabianex.data.model.UnlinkSupervisionResponse
 import retrofit2.Response
 import retrofit2.http.Body
@@ -167,7 +168,7 @@ interface ApiService {
     @PATCH("support-contacts/{id}")
     suspend fun updateSupportContact(
         @Path("id") contactId: String,
-        @Body request: CreateSupportContactRequest,
+        @Body request: UpdateSupportContactRequest,
     ): Response<MutationResponse<SupportContactDto>>
 
     @GET("local-resources")

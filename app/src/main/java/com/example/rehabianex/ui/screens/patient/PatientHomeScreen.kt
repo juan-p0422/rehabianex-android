@@ -64,7 +64,6 @@ private fun PatientHomeContent(
         items = listOf(
             HomeMenuItem("Perfil", Routes.PatientProfile, R.drawable.ic_nav_patients),
             HomeMenuItem("Notificaciones", Routes.Notifications, R.drawable.ic_nav_alerts),
-            HomeMenuItem("Demostración FCM", Routes.FcmDemo, R.drawable.ic_nav_alerts),
             HomeMenuItem("Vinculación", Routes.SupervisorLink, R.drawable.ic_nav_support),
         ),
         onNavigate = onNavigate,

@@ -75,11 +75,6 @@ fun AdminHomeScreen(
         HomeOverflowMenu(
             items = listOf(
                 HomeMenuItem(
-                    label = "Demostración FCM",
-                    route = Routes.FcmDemo,
-                    iconRes = R.drawable.ic_nav_alerts,
-                ),
-                HomeMenuItem(
                     label = "Cerrar sesión",
                     route = ADMIN_LOGOUT_ACTION,
                     iconRes = R.drawable.ic_nav_more,
@@ -466,11 +461,6 @@ fun AdminPanelUnavailableScreen(
     ScreenScaffold {
         HomeOverflowMenu(
             items = listOf(
-                HomeMenuItem(
-                    label = "Demostración FCM",
-                    route = Routes.FcmDemo,
-                    iconRes = R.drawable.ic_nav_alerts,
-                ),
                 HomeMenuItem(
                     label = "Cerrar sesión",
                     route = ADMIN_LOGOUT_ACTION,

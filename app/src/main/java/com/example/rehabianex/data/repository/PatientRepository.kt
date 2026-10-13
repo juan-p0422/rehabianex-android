@@ -57,6 +57,7 @@ import com.example.rehabianex.data.model.UpdateConsentRequest
 import com.example.rehabianex.data.model.SupervisionPolicy
 import com.example.rehabianex.data.model.UpdatePatientRequest
 import com.example.rehabianex.data.model.UpdateSupervisionRequest
+import com.example.rehabianex.data.model.UpdateSupportContactRequest
 import com.example.rehabianex.data.model.isPatientPrivacyRestricted
 import com.example.rehabianex.data.model.resolvedPatientDisplayName
 import com.example.rehabianex.data.remote.ApiErrorParser
@@ -383,7 +384,7 @@ class PatientRepository(
         if (cached.isEmpty() && !hasCacheState(uid, CONTACTS_RESOURCE)) return null
         return PatientDataResult.Success(
             data = cached.mapNotNull { it.toDto().toSupportContact() }
-                .sortedWith(compareBy<SupportContact> { it.priority }.thenBy { it.name.lowercase() }),
+                .sortedWith(compareByDescending<SupportContact> { it.priority }.thenBy { it.name.lowercase() }),
             offlineStatus = cachedStatus(uid, CONTACTS_RESOURCE, isRefreshing = true),
         )
     }
@@ -400,7 +401,7 @@ class PatientRepository(
         cacheContacts(uid, contacts)
         contacts
             .mapNotNull { it.toSupportContact() }
-            .sortedWith(compareBy<SupportContact> { it.priority }.thenBy { it.name.lowercase() })
+            .sortedWith(compareByDescending<SupportContact> { it.priority }.thenBy { it.name.lowercase() })
         }
         return remote.withOfflineFallback(cached)
     }
@@ -408,6 +409,7 @@ class PatientRepository(
     suspend fun saveSupportContact(
         request: CreateSupportContactRequest,
         contactId: String? = null,
+        preserveLegacyPriority: Boolean = false,
     ): PatientDataResult<String> = safeRequest(
         defaultUnexpectedMessage = "Ocurrió un error inesperado al guardar el contacto.",
     ) {
@@ -420,7 +422,16 @@ class PatientRepository(
             authorizedCall {
                 apiService.updateSupportContact(
                     contactId = cleanContactId,
-                    request = request,
+                    request = UpdateSupportContactRequest(
+                        name = request.name,
+                        relationship = request.relationship,
+                        phone = request.phone,
+                        priority = request.priority.takeUnless { preserveLegacyPriority },
+                        canReceiveAlerts = request.canReceiveAlerts,
+                        notes = request.notes,
+                        relationshipCategory = request.relationshipCategory,
+                        relationshipOther = request.relationshipOther,
+                    ),
                 )
             }
         }
@@ -2125,9 +2136,13 @@ class PatientRepository(
             name = cleanName,
             type = cleanType,
             typeLabel = cleanType.localResourceTypeLabel(),
-            city = city.cleanText() ?: "Sin ciudad",
-            detail = detailParts.joinToString("\n").ifBlank { "Recurso de apoyo" },
+            city = city.cleanText().orEmpty(),
+            detail = detailParts.joinToString("\n"),
             phone = phone.cleanText().orEmpty(),
+            sourceName = sourceName.cleanText().orEmpty(),
+            sourceUrl = sourceUrl.cleanText().orEmpty(),
+            reviewedAt = reviewedAt.cleanText().orEmpty(),
+            updatedAt = updatedAt.cleanText().orEmpty(),
         )
     }
 

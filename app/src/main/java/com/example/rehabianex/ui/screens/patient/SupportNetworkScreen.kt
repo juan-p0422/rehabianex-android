@@ -1,13 +1,13 @@
 package com.example.rehabianex.ui.screens.patient
 
-import android.widget.Toast
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,6 +55,7 @@ fun SupportNetworkScreen(
 ) {
     var showForm by rememberSaveable { mutableStateOf(false) }
     var editingContactId by rememberSaveable { mutableStateOf<String?>(null) }
+    var contactToCall by rememberSaveable { mutableStateOf<SupportContact?>(null) }
     val context = LocalContext.current
     val contacts = (uiState as? SupportContactsUiState.Content)?.contacts.orEmpty()
     val editingContact = contacts.firstOrNull { it.id == editingContactId }
@@ -94,13 +95,7 @@ fun SupportNetworkScreen(
                 OfflineStatusCard(uiState.offlineStatus)
                 SupportNetworkContent(
                 contacts = uiState.contacts,
-                onContact = { contact ->
-                    dialPhone(
-                        context = context,
-                        phone = contact.phone,
-                        message = "Se abrirá el teléfono para marcar a ${contact.name}.",
-                    )
-                },
+                onContact = { contact -> contactToCall = contact },
                 onEdit = { contact ->
                     editingContactId = contact.id
                     showForm = true
@@ -142,26 +137,67 @@ fun SupportNetworkScreen(
             onNavigate(Routes.SupervisorLink)
         }
         Spacer(Modifier.height(14.dp))
-        RehabianexDangerButton("Necesito apoyo ahora") {
-            val priorityContact = contacts.minWithOrNull(
-                compareBy<SupportContact> { it.priority }.thenBy { it.name.lowercase() },
+        RehabianexDangerButton(
+            text = "Necesito apoyo ahora",
+            enabled = contacts.isNotEmpty(),
+        ) {
+            val priorityContact = selectHighestPriorityContact(contacts)
+            contactToCall = priorityContact
+        }
+        if (contacts.isEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Configura al menos un contacto para elegir un destinatario.",
+                color = RehabianexColors.GrayText,
             )
-
-            if (priorityContact == null) {
-                Toast.makeText(
-                    context,
-                    "Agrega al menos un contacto de apoyo para usar esta opción.",
-                    Toast.LENGTH_SHORT,
-                ).show()
-            } else {
-                dialPhone(
-                    context = context,
-                    phone = priorityContact.phone,
-                    message = "Se marcará a ${priorityContact.name}, tu contacto de mayor prioridad.",
-                )
+            Spacer(Modifier.height(6.dp))
+            RehabianexOutlineButton("Configurar contacto de apoyo") {
+                showForm = true
+                onInputChanged()
             }
         }
     }
+
+    contactToCall?.let { contact ->
+        AlertDialog(
+            onDismissRequest = { contactToCall = null },
+            title = { Text("Confirmar contacto") },
+            text = {
+                Text(
+                    "Destinatario: ${contact.name}. Canal: aplicación Teléfono. " +
+                        "Se abrirá otra aplicación y tú deberás confirmar la llamada. " +
+                        "Esta acción no garantiza atención de emergencia ni respuesta.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        contactToCall = null
+                        dialPhone(
+                            context = context,
+                            phone = contact.phone,
+                            message = "Se abrirá Teléfono para marcar a ${contact.name}; confirma allí la llamada.",
+                        )
+                    },
+                ) { Text("Abrir Teléfono") }
+            },
+            dismissButton = {
+                TextButton(onClick = { contactToCall = null }) { Text("Cancelar") }
+            },
+        )
+    }
+}
+
+internal fun selectHighestPriorityContact(contacts: List<SupportContact>): SupportContact? =
+    contacts.sortedWith(
+        compareByDescending<SupportContact> { it.priority.takeIf { value -> value in 1..5 } ?: 0 }
+            .thenBy { it.name.lowercase() },
+    ).firstOrNull()
+
+internal fun supportPriorityDescription(priority: Int): String = if (priority in 1..5) {
+    "Prioridad $priority de 5 (5 = mayor)"
+} else {
+    "Prioridad histórica $priority; selecciona 1–5 para cambiarla"
 }
 
 @Composable
@@ -188,7 +224,7 @@ private fun SupportContactForm(
     var phone by rememberSaveable(initialContact?.id) { mutableStateOf(initialPhone.number) }
     var phoneRegion by rememberSaveable(initialContact?.id) { mutableStateOf(initialPhone.region) }
     var priority by rememberSaveable(initialContact?.id) {
-        mutableStateOf(initialContact?.priority?.coerceIn(1, 5)?.toString() ?: "1")
+        mutableStateOf(initialContact?.priority?.toString() ?: "1")
     }
     var canReceiveAlerts by rememberSaveable(initialContact?.id) {
         mutableStateOf(initialContact?.canReceiveAlerts ?: true)
@@ -266,6 +302,13 @@ private fun SupportContactForm(
         )
         Spacer(Modifier.height(8.dp))
         Text("Prioridad", fontWeight = FontWeight.Bold)
+        Text("5 = mayor prioridad", color = RehabianexColors.GrayText)
+        if (initialContact?.priority !in 1..5 && initialContact != null && priority !in (1..5).map(Int::toString)) {
+            Text(
+                "Valor histórico ${initialContact.priority}; se conservará si no eliges otro.",
+                color = RehabianexColors.GrayText,
+            )
+        }
         ChipSelector(
             options = (1..5).map(Int::toString),
             selected = priority,
@@ -318,6 +361,7 @@ private fun SupportContactForm(
                     phoneRegion = phoneRegion,
                     relationshipCategory = relationship,
                     relationshipOther = customRelationship,
+                    originalPriority = initialContact?.priority,
                     priority = priority,
                     canReceiveAlerts = canReceiveAlerts,
                     notes = notes,
@@ -418,7 +462,7 @@ private fun SupportContactCard(
                     Text(contact.phone, color = RehabianexColors.GrayText)
                 }
                 Text(
-                    "Prioridad ${contact.priority}",
+                    supportPriorityDescription(contact.priority),
                     color = RehabianexColors.GreenDark,
                 )
                 Spacer(Modifier.height(8.dp))

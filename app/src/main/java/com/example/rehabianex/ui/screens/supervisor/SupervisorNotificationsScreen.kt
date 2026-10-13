@@ -45,6 +45,15 @@ fun SupervisorNotificationsScreen(
         ScreenHeader("Notificaciones", "Avisos de seguimiento")
         Spacer(Modifier.height(12.dp))
         NotificationPermissionBanner()
+        SoftCard {
+            Text("Tipos de avisos", fontWeight = FontWeight.Bold)
+            Text(
+                "Las horas configuradas aquí generan recordatorios locales. " +
+                    "Los avisos remotos FCM dependen del servidor y muestran contenido discreto.",
+                color = RehabianexColors.GrayText,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
         (uiState as? SupervisorNotificationsUiState.Content)?.let {
             SafeCacheStatus(it.isRefreshing, it.lastSyncedAt, it.errorMessage)
         }

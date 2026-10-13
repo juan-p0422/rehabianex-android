@@ -282,22 +282,24 @@ fun RehabianexNavHost(
                 onLogout = logout,
             )
         }
-        composable(Routes.FcmDemo) {
-            val role = sessionManager.getRole()
-            val viewModel: FcmDemoViewModel = viewModel(
-                factory = FcmDemoViewModel.Factory(fcmDemoRepository, role),
-            )
-            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-            FcmDemoScreen(
-                role = role,
-                uiState = uiState,
-                onSend = viewModel::send,
-                onBack = {
-                    if (!navController.popBackStack()) {
-                        homeRouteForRole(role)?.let { navController.navigateSingleTop(it) }
-                    }
-                },
-            )
+        if (BuildConfig.DEBUG) {
+            composable(Routes.FcmDemo) {
+                val role = sessionManager.getRole()
+                val viewModel: FcmDemoViewModel = viewModel(
+                    factory = FcmDemoViewModel.Factory(fcmDemoRepository, role),
+                )
+                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+                FcmDemoScreen(
+                    role = role,
+                    uiState = uiState,
+                    onSend = viewModel::send,
+                    onBack = {
+                        if (!navController.popBackStack()) {
+                            homeRouteForRole(role)?.let { navController.navigateSingleTop(it) }
+                        }
+                    },
+                )
+            }
         }
     }
 

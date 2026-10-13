@@ -73,7 +73,16 @@ data class SupportContactFormInput(
     val phoneRegion: String = PHONE_REGION_MEXICO,
     val relationshipCategory: String = CONTACT_RELATIONSHIP_OTHER,
     val relationshipOther: String = "",
+    val originalPriority: Int? = null,
 )
+
+internal fun shouldPreserveLegacySupportPriority(
+    contactId: String?,
+    originalPriority: Int?,
+    enteredPriority: String,
+): Boolean = contactId != null &&
+    originalPriority !in 1..5 &&
+    enteredPriority.toIntOrNull() == originalPriority
 
 data class PrivacyFormInput(
     val displayName: String,
@@ -533,7 +542,18 @@ class SupportNetworkViewModel(
 
         viewModelScope.launch {
             _saveState.value = FormSaveUiState.Loading
-            _saveState.value = when (val result = repository.saveSupportContact(request, input.contactId)) {
+            val preserveLegacyPriority = shouldPreserveLegacySupportPriority(
+                contactId = input.contactId,
+                originalPriority = input.originalPriority,
+                enteredPriority = input.priority,
+            )
+            _saveState.value = when (
+                val result = repository.saveSupportContact(
+                    request = request,
+                    contactId = input.contactId,
+                    preserveLegacyPriority = preserveLegacyPriority,
+                )
+            ) {
                 is PatientDataResult.Success -> {
                     invalidatePatientRefreshes()
                     refreshIfStale(force = true)
@@ -555,7 +575,13 @@ class SupportNetworkViewModel(
         val cleanName = name.cleanFormText(maxLength = 80)
         val cleanRelationship = relationship.cleanFormText(maxLength = 60)
         val validatedPhone = PhoneNumberValidator.validate(phoneRegion, phone)
-        val priorityValue = priority.toIntOrNull()?.takeIf { it in 1..5 }
+        val parsedPriority = priority.toIntOrNull()
+        val preserveLegacyPriority = shouldPreserveLegacySupportPriority(
+            contactId = contactId,
+            originalPriority = originalPriority,
+            enteredPriority = priority,
+        )
+        val priorityValue = parsedPriority?.takeIf { it in 1..5 }
         val cleanNotes = notes.cleanFormText(maxLength = 180)
         val errors = buildMap {
             if (cleanName == null || !cleanName.isHumanLabel(minLength = 2, maxLength = 80)) {
@@ -574,7 +600,7 @@ class SupportNetworkViewModel(
                 put("relationship", "Describe la relación con el contacto.")
             }
             validatedPhone.error?.let { put("phone", it) }
-            if (priorityValue == null) {
+            if (priorityValue == null && !preserveLegacyPriority) {
                 put("priority", "Selecciona una prioridad válida.")
             }
         }
@@ -591,7 +617,8 @@ class SupportNetworkViewModel(
             name = cleanName!!,
             relationship = cleanRelationship!!,
             phone = checkNotNull(validatedPhone.value),
-            priority = priorityValue!!,
+            // The repository omits this field from a legacy-only PATCH. It is never sent as 1.
+            priority = priorityValue ?: 1,
             canReceiveAlerts = canReceiveAlerts,
             notes = cleanNotes,
             relationshipCategory = relationshipCategory,

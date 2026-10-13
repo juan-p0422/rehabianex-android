@@ -51,6 +51,15 @@ fun NotificationsScreen(
         ScreenHeader("Notificaciones", "Configuración discreta")
         Spacer(Modifier.height(12.dp))
         NotificationPermissionBanner()
+        SoftCard {
+            Text("Tipos de avisos", fontWeight = FontWeight.Bold)
+            Text(
+                "Los recordatorios configurados aquí son locales en este dispositivo. " +
+                    "Los avisos remotos FCM dependen del servidor y siempre usan contenido discreto.",
+                color = RehabianexColors.GrayText,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
         when (uiState) {
             NotificationSettingsUiState.Loading -> NotificationsLoading()
             is NotificationSettingsUiState.Error -> NotificationsError(uiState.message, onRetry)

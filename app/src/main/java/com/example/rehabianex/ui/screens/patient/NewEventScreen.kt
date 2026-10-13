@@ -2,7 +2,11 @@ package com.example.rehabianex.ui.screens.patient
 
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,7 +17,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.rehabianex.ui.components.BackLink
 import com.example.rehabianex.ui.components.ChipSelector
@@ -30,8 +33,11 @@ import com.example.rehabianex.ui.components.TimeSelector12h
 import com.example.rehabianex.ui.components.formatTime12h
 import com.example.rehabianex.ui.theme.RehabianexColors
 import java.time.LocalDateTime
+import java.time.Instant
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewEventScreen(
     saveState: FormSaveUiState,
@@ -50,6 +56,7 @@ fun NewEventScreen(
     var duration by rememberSaveable { mutableStateOf("60") }
     var location by rememberSaveable { mutableStateOf("") }
     var notes by rememberSaveable { mutableStateOf("") }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
     val isSaving = saveState is FormSaveUiState.Loading
     val fieldErrors = (saveState as? FormSaveUiState.Error)?.fieldErrors.orEmpty()
 
@@ -102,14 +109,21 @@ fun NewEventScreen(
             }
         }
         Spacer(Modifier.height(10.dp))
-        InputField(
-            value = date,
-            onValueChange = { value -> update { date = value.take(10) } },
-            label = "Fecha (AAAA-MM-DD)",
-            enabled = !isSaving,
-            errorMessage = fieldErrors["date"],
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-        )
+        RehabianexCard {
+            Text("Fecha", fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text(date, color = RehabianexColors.GrayText)
+            Spacer(Modifier.height(8.dp))
+            RehabianexOutlineButton(
+                text = "Seleccionar fecha en calendario",
+                enabled = !isSaving,
+                onClick = { showDatePicker = true },
+            )
+            fieldErrors["date"]?.let { message ->
+                Spacer(Modifier.height(4.dp))
+                Text(message, color = RehabianexColors.Red)
+            }
+        }
         Spacer(Modifier.height(10.dp))
         TimeSelector12h(
             value = startTime,
@@ -179,6 +193,36 @@ fun NewEventScreen(
         }
         Spacer(Modifier.height(8.dp))
         RehabianexOutlineButton("Cancelar", enabled = !isSaving, onClick = onCancel)
+    }
+
+    if (showDatePicker) {
+        val initialMillis = runCatching {
+            java.time.LocalDate.parse(date).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        }.getOrElse { suggestedStart.toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() }
+        val pickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pickerState.selectedDateMillis?.let { selectedMillis ->
+                            update {
+                                date = Instant.ofEpochMilli(selectedMillis)
+                                    .atZone(ZoneOffset.UTC)
+                                    .toLocalDate()
+                                    .toString()
+                            }
+                        }
+                        showDatePicker = false
+                    },
+                ) { Text("Aceptar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
+            },
+        ) {
+            DatePicker(state = pickerState, title = { Text("Selecciona la fecha del evento") })
+        }
     }
 }
 
