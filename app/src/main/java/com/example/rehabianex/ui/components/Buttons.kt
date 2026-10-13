@@ -27,6 +27,7 @@ fun RehabianexButton(
         text = text,
         onClick = onClick,
         containerColor = RehabianexColors.GreenMain,
+        contentColor = RehabianexColors.Black,
         modifier = modifier,
         enabled = enabled,
     )
@@ -42,6 +43,7 @@ fun RehabianexSecondaryButton(
         text = text,
         onClick = onClick,
         containerColor = RehabianexColors.BlueSoft,
+        contentColor = RehabianexColors.Black,
         modifier = modifier,
     )
 }
@@ -57,6 +59,7 @@ fun RehabianexDangerButton(
         text = text,
         onClick = onClick,
         containerColor = RehabianexColors.Red,
+        contentColor = Color.White,
         modifier = modifier,
         enabled = enabled,
     )
@@ -91,6 +94,7 @@ private fun FilledRehabianexButton(
     text: String,
     onClick: () -> Unit,
     containerColor: Color,
+    contentColor: Color,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
@@ -101,7 +105,10 @@ private fun FilledRehabianexButton(
             .heightIn(min = 48.dp),
         enabled = enabled,
         shape = ButtonShape,
-        colors = ButtonDefaults.buttonColors(containerColor = containerColor),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = containerColor,
+            contentColor = contentColor,
+        ),
     ) {
         Text(text)
     }

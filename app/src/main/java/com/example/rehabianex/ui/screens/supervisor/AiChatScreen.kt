@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -168,7 +169,7 @@ private fun ChatHeader(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = RehabianexColors.GreenMain,
+        color = RehabianexColors.GreenDark,
     ) {
         Row(
             modifier = Modifier
@@ -221,7 +222,7 @@ private fun ChatInputBar(
                 value = value,
                 onValueChange = onValueChange,
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Escribe tu pregunta con el contexto necesario") },
+                label = { Text("Escribe tu pregunta con el contexto necesario") },
                 enabled = enabled,
                 minLines = 2,
                 maxLines = 5,
@@ -241,10 +242,13 @@ private fun ChatInputBar(
             Button(
                 onClick = onSend,
                 enabled = canSend,
-                modifier = Modifier.align(Alignment.End),
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .heightIn(min = 48.dp),
                 shape = RoundedCornerShape(24.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = RehabianexColors.GreenMain,
+                    contentColor = RehabianexColors.Black,
                     disabledContainerColor = RehabianexColors.GrayBorder,
                     disabledContentColor = RehabianexColors.GrayText,
                 ),

@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rehabianex.ui.theme.RehabianexColors
@@ -112,27 +114,30 @@ private fun TimeStepper(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(label, color = RehabianexColors.GrayText, fontSize = 12.sp)
-        StepButton("−", enabled, onDecrease)
+        StepButton("−", "Disminuir $label", enabled, onDecrease)
         Text(
             value,
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp,
             textAlign = TextAlign.Center,
         )
-        StepButton("+", enabled, onIncrease)
+        StepButton("+", "Aumentar $label", enabled, onIncrease)
     }
 }
 
 @Composable
 private fun StepButton(
     text: String,
+    accessibilityLabel: String,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.size(width = 48.dp, height = 36.dp),
+        modifier = Modifier
+            .size(48.dp)
+            .semantics { contentDescription = accessibilityLabel },
         shape = RoundedCornerShape(12.dp),
         contentPadding = PaddingValues(0.dp),
         border = BorderStroke(1.dp, RehabianexColors.GreenMain),
@@ -161,7 +166,7 @@ private fun PeriodSelector(
                 label = { Text(period) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = RehabianexColors.GreenMain,
-                    selectedLabelColor = RehabianexColors.GrayCard,
+                    selectedLabelColor = RehabianexColors.Black,
                     containerColor = RehabianexColors.GrayCard,
                 ),
             )

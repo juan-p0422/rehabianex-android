@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,6 +28,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -191,9 +194,21 @@ private fun CalendarDayCell(
     modifier: Modifier = Modifier,
 ) {
     val isToday = day == today
+    val cellModifier = modifier.heightIn(min = 56.dp).let { baseModifier ->
+        if (day == null) {
+            baseModifier
+        } else {
+            val eventDescription = if (eventCount == 1) "1 evento" else "$eventCount eventos"
+            val todayDescription = if (isToday) ", hoy" else ""
+            baseModifier.clearAndSetSemantics {
+                contentDescription =
+                    "${day.dayOfMonth} de ${day.month.spanishName()} de ${day.year}, " +
+                        "$eventDescription$todayDescription"
+            }
+        }
+    }
     Surface(
-        modifier = modifier
-            .height(42.dp),
+        modifier = cellModifier,
         shape = RoundedCornerShape(10.dp),
         color = when {
             day == null -> RehabianexColors.GrayCard

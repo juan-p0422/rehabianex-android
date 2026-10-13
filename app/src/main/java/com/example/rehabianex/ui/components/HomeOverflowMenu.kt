@@ -51,7 +51,7 @@ fun HomeOverflowMenu(
             ) {
                 IconButton(
                     onClick = { expanded = true },
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
                         painter = painterResource(R.drawable.ic_nav_more),

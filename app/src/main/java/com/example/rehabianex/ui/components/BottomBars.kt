@@ -2,11 +2,12 @@ package com.example.rehabianex.ui.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,6 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rehabianex.ui.theme.RehabianexColors
@@ -53,17 +57,23 @@ fun BottomNavigationBar(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .clickable { onItemClick(item) },
+                        .heightIn(min = 48.dp)
+                        .selectable(
+                            selected = selected,
+                            role = Role.Tab,
+                            onClick = { onItemClick(item) },
+                        )
+                        .semantics { contentDescription = item.label },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(3.dp),
                 ) {
                     Icon(
                         painter = painterResource(item.iconRes),
-                        contentDescription = item.label,
+                        contentDescription = null,
                         tint = if (selected) {
                             RehabianexColors.GreenMain
                         } else {
-                            RehabianexColors.GrayBorder
+                            RehabianexColors.GrayText
                         },
                         modifier = Modifier
                             .size(22.dp),

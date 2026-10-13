@@ -9,7 +9,7 @@ object RehabianexColors {
     val GreenVerySoft = Color(0xFFEEF5F0)
     val BlueSoft = Color(0xFF6FA8DC)
     val BlueLight = Color(0xFFDDEBFA)
-    val Red = Color(0xFFE85D4F)
+    val Red = Color(0xFFB3261E)
     val Yellow = Color(0xFFF4C542)
     val GrayBg = Color(0xFFF1F3F2)
     val GrayCard = Color(0xFFFFFFFF)

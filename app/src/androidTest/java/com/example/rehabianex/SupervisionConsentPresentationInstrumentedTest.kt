@@ -40,7 +40,9 @@ class SupervisionConsentPresentationInstrumentedTest {
         composeRule.onNodeWithContentDescription("Compartir Teléfono").assertIsOff()
         composeRule.onNodeWithText("Activar consentimiento").assertIsNotEnabled()
 
-        composeRule.onNodeWithContentDescription("Compartir Notas de seguimiento").performClick()
+        composeRule.onNodeWithContentDescription("Compartir Notas de seguimiento")
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithContentDescription("Compartir Notas de seguimiento").assertIsOn()
         composeRule.onNodeWithText("Activar consentimiento")
             .performScrollTo()
@@ -65,7 +67,9 @@ class SupervisionConsentPresentationInstrumentedTest {
         )
 
         composeRule.onNodeWithText("Administrar acceso del supervisor").performClick()
-        composeRule.onNodeWithText("Retirar solicitud pendiente").performClick()
+        composeRule.onNodeWithText("Retirar solicitud pendiente")
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithText("Retirar solicitud", useUnmergedTree = true).performClick()
 
         composeRule.runOnIdle { assertEquals("request-1", cancelledId) }

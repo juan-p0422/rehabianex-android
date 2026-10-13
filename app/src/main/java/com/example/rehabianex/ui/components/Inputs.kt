@@ -38,7 +38,7 @@ fun InputField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier.fillMaxWidth(),
-        placeholder = { Text(label) },
+        label = { Text(label) },
         singleLine = true,
         enabled = enabled,
         isError = errorMessage != null,
@@ -69,8 +69,8 @@ fun InputField(
             unfocusedContainerColor = RehabianexColors.GrayCard,
             focusedBorderColor = RehabianexColors.GreenMain,
             unfocusedBorderColor = RehabianexColors.GrayBorder,
-            focusedPlaceholderColor = RehabianexColors.GrayText,
-            unfocusedPlaceholderColor = RehabianexColors.GrayText,
+            focusedLabelColor = RehabianexColors.GreenDark,
+            unfocusedLabelColor = RehabianexColors.GrayText,
         ),
     )
 }
@@ -142,7 +142,7 @@ fun TextAreaField(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 100.dp),
-        placeholder = { Text(label) },
+        label = { Text(label) },
         minLines = 3,
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(

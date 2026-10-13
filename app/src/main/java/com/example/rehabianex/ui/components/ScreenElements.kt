@@ -21,6 +21,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -155,12 +157,18 @@ fun SimpleBarChart(
     values: List<Float>,
     modifier: Modifier = Modifier,
 ) {
+    val accessibleValues = values.joinToString(separator = ", ") { value ->
+        "${(value.coerceIn(0f, 1f) * 100).toInt()} por ciento"
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 100.dp)
             .background(RehabianexColors.GreenVerySoft, RoundedCornerShape(12.dp))
-            .padding(12.dp),
+            .padding(12.dp)
+            .clearAndSetSemantics {
+                contentDescription = "Valores de la tendencia: $accessibleValues"
+            },
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.Bottom,
     ) {
@@ -203,7 +211,7 @@ fun ChatBubble(
                     RoundedCornerShape(16.dp),
                 )
                 .padding(12.dp),
-            color = if (fromUser) Color.White else RehabianexColors.Black,
+            color = RehabianexColors.Black,
         )
     }
 }

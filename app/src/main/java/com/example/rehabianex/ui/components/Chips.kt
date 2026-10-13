@@ -30,7 +30,7 @@ fun ChipSelector(
                 label = { Text(option) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = RehabianexColors.GreenMain,
-                    selectedLabelColor = RehabianexColors.GrayCard,
+                    selectedLabelColor = RehabianexColors.Black,
                     containerColor = RehabianexColors.GrayCard,
                 ),
             )
@@ -56,7 +56,7 @@ fun MultiChipSelector(
                 label = { Text(option) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = RehabianexColors.GreenMain,
-                    selectedLabelColor = RehabianexColors.GrayCard,
+                    selectedLabelColor = RehabianexColors.Black,
                     containerColor = RehabianexColors.GrayCard,
                 ),
             )
