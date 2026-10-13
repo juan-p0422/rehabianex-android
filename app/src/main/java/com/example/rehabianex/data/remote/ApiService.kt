@@ -1,6 +1,8 @@
 package com.example.rehabianex.data.remote
 
 import com.example.rehabianex.data.model.AuthResponse
+import com.example.rehabianex.data.model.AccountDeletionRequest
+import com.example.rehabianex.data.model.AccountDeletionResponse
 import com.example.rehabianex.data.model.AdminAuthorizeSupervisorRequest
 import com.example.rehabianex.data.model.AdminSupervisorReasonRequest
 import com.example.rehabianex.data.model.AdminSupervisorResponse
@@ -12,6 +14,7 @@ import com.example.rehabianex.data.model.CreatePatientNoteRequest
 import com.example.rehabianex.data.model.CreateConsentRequest
 import com.example.rehabianex.data.model.CreateAgendaEventRequest
 import com.example.rehabianex.data.model.CreateSupportContactRequest
+import com.example.rehabianex.data.model.DataControlSummaryResponse
 import com.example.rehabianex.data.model.CreateSupervisionRequest
 import com.example.rehabianex.data.model.FcmTokenRegistrationRequest
 import com.example.rehabianex.data.model.FcmTokenRevocationRequest
@@ -46,6 +49,7 @@ import com.example.rehabianex.data.model.UpdateSupervisorRequest
 import com.example.rehabianex.data.model.UpdateSupportContactRequest
 import com.example.rehabianex.data.model.UnlinkSupervisionResponse
 import retrofit2.Response
+import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -73,6 +77,17 @@ interface ApiService {
 
     @POST("auth/logout")
     suspend fun logout(): Response<MutationResponse<Unit>>
+
+    @GET("data-control/summary")
+    suspend fun dataControlSummary(): Response<DataControlSummaryResponse>
+
+    @GET("data-control/export")
+    suspend fun exportOwnData(): Response<ResponseBody>
+
+    @POST("data-control/account-deletion-requests")
+    suspend fun requestAccountDeletion(
+        @Body request: AccountDeletionRequest,
+    ): Response<AccountDeletionResponse>
 
     @POST("notifications/fcm-token")
     suspend fun registerFcmToken(

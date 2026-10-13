@@ -6,12 +6,14 @@ import com.example.rehabianex.core.session.SessionManager
 import com.example.rehabianex.core.session.OfflineDataCleanupCoordinator
 import com.example.rehabianex.core.session.SessionRefreshCoordinator
 import com.example.rehabianex.data.local.PatientIdentityStore
+import com.example.rehabianex.data.export.DataExportFileManager
 import com.example.rehabianex.data.local.AndroidNetworkStatusProvider
 import com.example.rehabianex.data.local.SupervisorNotificationSettingsStore
 import com.example.rehabianex.data.local.db.RehabiAnexDatabase
 import com.example.rehabianex.data.remote.ApiService
 import com.example.rehabianex.data.repository.AdminRepository
 import com.example.rehabianex.data.repository.AuthRepository
+import com.example.rehabianex.data.repository.DataControlRepository
 import com.example.rehabianex.data.repository.PatientRepository
 import com.example.rehabianex.data.repository.SupervisorRepository
 import com.example.rehabianex.data.repository.FcmDemoRepository
@@ -33,6 +35,7 @@ class AppContainer(context: Context) {
     private val networkStatusProvider = AndroidNetworkStatusProvider(applicationContext)
     private val patientIdentityStore = PatientIdentityStore(context)
     private val supervisorNotificationSettingsStore = SupervisorNotificationSettingsStore(context)
+    val dataExportFileManager = DataExportFileManager(applicationContext)
     val adminRepository = AdminRepository(
         apiService = apiService,
         sessionManager = sessionManager,
@@ -71,12 +74,28 @@ class AppContainer(context: Context) {
         clearInMemoryState = supervisorRepository::clearSessionMemory,
     )
 
+    val dataControlRepository = DataControlRepository(
+        apiService = apiService,
+        sessionManager = sessionManager,
+        clearLocalUserData = { uid, role ->
+            offlineDataCleanupCoordinator.clearAfterConfirmedLogout(uid, role)
+            dataExportFileManager.clearExports()
+        },
+        sessionRefreshCoordinator = sessionRefreshCoordinator,
+    )
+
     val authRepository = AuthRepository(
         apiService = apiService,
         sessionManager = sessionManager,
-        clearLocalUserData = offlineDataCleanupCoordinator::clearAfterConfirmedLogout,
+        clearLocalUserData = { uid, role ->
+            offlineDataCleanupCoordinator.clearAfterConfirmedLogout(uid, role)
+            dataExportFileManager.clearExports()
+        },
         pendingLocalNotesCount = offlineDataCleanupCoordinator::pendingPatientNotes,
-        clearPreviousUserData = offlineDataCleanupCoordinator::clearForUserSwitch,
+        clearPreviousUserData = { uid, role ->
+            offlineDataCleanupCoordinator.clearForUserSwitch(uid, role)
+            dataExportFileManager.clearExports()
+        },
         restrictPrivatePatientIdentity = patientRepository::restrictPrivateIdentityFromLogin,
         registerFcmToken = {
             withTimeoutOrNull(FCM_OPERATION_TIMEOUT_MILLIS) {

@@ -34,9 +34,11 @@ import com.example.rehabianex.core.session.SessionManager
 import com.example.rehabianex.core.session.SessionInvalidationBus
 import com.example.rehabianex.data.repository.AdminRepository
 import com.example.rehabianex.data.repository.AuthRepository
+import com.example.rehabianex.data.repository.DataControlRepository
 import com.example.rehabianex.data.repository.PatientRepository
 import com.example.rehabianex.data.repository.SupervisorRepository
 import com.example.rehabianex.data.repository.FcmDemoRepository
+import com.example.rehabianex.data.export.DataExportFileManager
 import com.example.rehabianex.notifications.NotificationRescheduleWorker
 import com.example.rehabianex.ui.screens.admin.AdminHomeScreen
 import com.example.rehabianex.ui.screens.admin.AdminHomeViewModel
@@ -48,6 +50,8 @@ import com.example.rehabianex.ui.screens.auth.LoginScreen
 import com.example.rehabianex.ui.screens.auth.RegisterScreen
 import com.example.rehabianex.ui.screens.auth.RoleSelectionScreen
 import com.example.rehabianex.ui.screens.auth.SplashScreen
+import com.example.rehabianex.ui.screens.data.DataControlScreen
+import com.example.rehabianex.ui.screens.data.DataControlViewModel
 import com.example.rehabianex.ui.screens.notifications.FcmDemoScreen
 import com.example.rehabianex.ui.screens.notifications.FcmDemoViewModel
 import com.example.rehabianex.validation.LoginFormInput
@@ -57,6 +61,8 @@ import kotlinx.coroutines.launch
 fun RehabianexNavHost(
     adminRepository: AdminRepository,
     authRepository: AuthRepository,
+    dataControlRepository: DataControlRepository,
+    dataExportFileManager: DataExportFileManager,
     patientRepository: PatientRepository,
     supervisorRepository: SupervisorRepository,
     fcmDemoRepository: FcmDemoRepository,
@@ -280,6 +286,31 @@ fun RehabianexNavHost(
                 onReactivate = viewModel::reactivate,
                 onNavigate = navController::navigateSingleTop,
                 onLogout = logout,
+            )
+        }
+        composable(Routes.DataControl) {
+            val viewModel: DataControlViewModel = viewModel(
+                factory = DataControlViewModel.Factory(dataControlRepository),
+            )
+            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            DataControlScreen(
+                uiState = uiState,
+                fileManager = dataExportFileManager,
+                onRetry = viewModel::load,
+                onExport = viewModel::exportData,
+                onExportHandled = viewModel::markExportHandled,
+                onNavigate = navController::navigateSingleTop,
+                onBack = {
+                    if (!navController.popBackStack()) {
+                        homeRouteForRole(sessionManager.getRole())?.let(navController::navigateSingleTop)
+                    }
+                },
+                onRequestAccountDeletion = viewModel::requestAccountDeletion,
+                onClearDeletionError = viewModel::clearDeletionError,
+                onDeletionCompleted = { requestId ->
+                    authInfoMessage = "Solicitud de eliminación registrada. Folio: $requestId"
+                    navController.returnToLogin()
+                },
             )
         }
         if (BuildConfig.DEBUG) {

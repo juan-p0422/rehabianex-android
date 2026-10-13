@@ -62,6 +62,8 @@ class MainActivity : ComponentActivity() {
                     RehabianexNavHost(
                         adminRepository = container.adminRepository,
                         authRepository = container.authRepository,
+                        dataControlRepository = container.dataControlRepository,
+                        dataExportFileManager = container.dataExportFileManager,
                         patientRepository = container.patientRepository,
                         supervisorRepository = container.supervisorRepository,
                         fcmDemoRepository = container.fcmDemoRepository,

@@ -131,6 +131,10 @@ fun SupervisorProfileScreen(
                         onNavigate(Routes.PatientsList)
                     }
                 }
+                Spacer(Modifier.height(8.dp))
+                RehabianexOutlineButton("Control de datos") {
+                    onNavigate(Routes.DataControl)
+                }
                 Spacer(Modifier.height(16.dp))
                 RehabianexDangerButton("Cerrar sesión", onClick = onLogout)
             }

@@ -75,6 +75,11 @@ fun AdminHomeScreen(
         HomeOverflowMenu(
             items = listOf(
                 HomeMenuItem(
+                    label = "Control de datos",
+                    route = Routes.DataControl,
+                    iconRes = R.drawable.ic_nav_more,
+                ),
+                HomeMenuItem(
                     label = "Cerrar sesión",
                     route = ADMIN_LOGOUT_ACTION,
                     iconRes = R.drawable.ic_nav_more,

@@ -235,6 +235,10 @@ private fun ProfileContent(
         onNavigate(Routes.Notifications)
     }
     Spacer(Modifier.height(8.dp))
+    RehabianexOutlineButton("Control de datos") {
+        onNavigate(Routes.DataControl)
+    }
+    Spacer(Modifier.height(8.dp))
     if (!profile.isStale) {
         RehabianexOutlineButton("Vinculación con supervisor") {
             onNavigate(Routes.SupervisorLink)

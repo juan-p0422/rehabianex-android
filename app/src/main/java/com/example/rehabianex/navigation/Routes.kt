@@ -32,6 +32,7 @@ object Routes {
     const val SupervisorNotifications = "supervisor_notifications"
 
     const val AdminHome = "admin_home"
+    const val DataControl = "data_control"
     const val FcmDemo = "fcm_demo"
 
     fun patientDetail(patientUid: String): String {
