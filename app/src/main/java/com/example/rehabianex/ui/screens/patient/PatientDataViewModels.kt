@@ -109,12 +109,19 @@ data class NotificationSettingsFormInput(
     val eventRemindersEnabled: Boolean,
     val motivationalEnabled: Boolean,
     val motivationalTime: String,
+    val adaptiveSuggestionsEnabled: Boolean,
+    val inactivityReminderEnabled: Boolean,
+    val inactivityDays: String,
+    val inactivityReminderTime: String,
 )
 
 sealed interface DailyNoteSaveUiState {
     data object Idle : DailyNoteSaveUiState
     data object Loading : DailyNoteSaveUiState
-    data class Success(val message: String) : DailyNoteSaveUiState
+    data class Success(
+        val message: String,
+        val suggestion: com.example.rehabianex.adaptive.AdaptiveSuggestion? = null,
+    ) : DailyNoteSaveUiState
     data class Error(
         val message: String,
         val fieldErrors: Map<String, String> = emptyMap(),
@@ -225,7 +232,10 @@ class EmotionalCheckinViewModel(
             _saveState.value = when (val result = repository.saveDailyNote(request)) {
                 is PatientDataResult.Success -> {
                     invalidatePatientRefreshes()
-                    DailyNoteSaveUiState.Success(result.data)
+                    DailyNoteSaveUiState.Success(
+                        message = result.data,
+                        suggestion = repository.handleAdaptiveNoteSaved(request),
+                    )
                 }
                 is PatientDataResult.Failure -> DailyNoteSaveUiState.Error(
                     result.message,
@@ -1330,11 +1340,19 @@ class NotificationsViewModel(
         val soberTime = soberDayTime.cleanTimeOrNull()
         val achievementTimeValue = achievementTime.cleanTimeOrNull()
         val motivationalTimeValue = motivationalTime.cleanTimeOrNull()
+        val inactivityTimeValue = inactivityReminderTime.cleanTimeOrNull()
+        val inactivityDaysValue = inactivityDays.toIntOrNull()
         val fieldErrors = buildMap {
             if (dailyNoteEnabled && dailyTime == null) put("dailyNoteTime", "Elige una hora válida.")
             if (soberDayEnabled && soberTime == null) put("soberDayTime", "Elige una hora válida.")
             if (achievementEnabled && achievementTimeValue == null) put("achievementTime", "Elige una hora válida.")
             if (motivationalEnabled && motivationalTimeValue == null) put("motivationalTime", "Elige una hora válida.")
+            if (inactivityReminderEnabled && inactivityTimeValue == null) {
+                put("inactivityReminderTime", "Elige una hora válida.")
+            }
+            if (inactivityReminderEnabled && inactivityDaysValue !in 2..14) {
+                put("inactivityDays", "Usa un valor de 2 a 14 días.")
+            }
         }
 
         if (fieldErrors.isNotEmpty()) {
@@ -1356,6 +1374,17 @@ class NotificationsViewModel(
             eventRemindersEnabled = eventRemindersEnabled,
             motivationalEnabled = motivationalEnabled,
             motivationalTime = motivationalTimeValue ?: currentSettings?.motivationalTime ?: "18:00",
+            adaptiveRulesAvailable = currentSettings?.adaptiveRulesAvailable ?: false,
+            adaptiveRulesVersion = currentSettings?.adaptiveRulesVersion,
+            adaptiveSuggestionsEnabled = adaptiveSuggestionsEnabled,
+            inactivityReminderEnabled = inactivityReminderEnabled,
+            inactivityDays = inactivityDaysValue ?: currentSettings?.inactivityDays ?: 3,
+            inactivityReminderTime = inactivityTimeValue
+                ?: currentSettings?.inactivityReminderTime
+                ?: "18:00",
+            adaptiveCravingThreshold = currentSettings?.adaptiveCravingThreshold ?: 8,
+            adaptiveAnxietyThreshold = currentSettings?.adaptiveAnxietyThreshold ?: 8,
+            timezone = currentSettings?.timezone ?: "America/Mexico_City",
         )
     }
 

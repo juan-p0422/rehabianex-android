@@ -34,6 +34,7 @@ class NotificationRescheduleWorker(
             is PatientDataResult.Failure -> emptyList()
         }
         NotificationScheduler.schedulePatient(applicationContext, settings.data, events)
+        container.adaptiveSupportManager.scheduleInactivity(settings.data)
         return Result.success()
     }
 

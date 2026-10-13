@@ -32,7 +32,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         AdminProfileSnapshotEntity::class,
         AdminDashboardSummaryEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(RoomConverters::class)
@@ -111,7 +111,14 @@ abstract class RehabiAnexDatabase : RoomDatabase() {
                 databaseName,
             )
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6,
+                    MIGRATION_6_7,
+                )
                 .build()
                 .also { encryptedDatabase ->
                     // Fuerza apertura, validación de clave y migraciones antes de exponer la instancia.
@@ -264,6 +271,19 @@ abstract class RehabiAnexDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE local_resources ADD COLUMN sourceName TEXT")
                 db.execSQL("ALTER TABLE local_resources ADD COLUMN sourceUrl TEXT")
                 db.execSQL("ALTER TABLE local_resources ADD COLUMN reviewedAt TEXT")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE notification_settings ADD COLUMN adaptiveRulesAvailable INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE notification_settings ADD COLUMN adaptiveRulesVersion TEXT")
+                db.execSQL("ALTER TABLE notification_settings ADD COLUMN adaptiveSuggestionsEnabled INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE notification_settings ADD COLUMN inactivityReminderEnabled INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE notification_settings ADD COLUMN inactivityDays INTEGER NOT NULL DEFAULT 3")
+                db.execSQL("ALTER TABLE notification_settings ADD COLUMN inactivityReminderTime TEXT NOT NULL DEFAULT '18:00'")
+                db.execSQL("ALTER TABLE notification_settings ADD COLUMN adaptiveCravingThreshold INTEGER NOT NULL DEFAULT 8")
+                db.execSQL("ALTER TABLE notification_settings ADD COLUMN adaptiveAnxietyThreshold INTEGER NOT NULL DEFAULT 8")
             }
         }
 

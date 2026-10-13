@@ -195,6 +195,20 @@ fun EmotionalCheckinScreen(
         )
         Spacer(Modifier.height(12.dp))
         SaveStatusCard(saveState)
+        val suggestion = (saveState as? DailyNoteSaveUiState.Success)?.suggestion
+        if (suggestion != null) {
+            Spacer(Modifier.height(10.dp))
+            SoftCard {
+                Text("Sugerencia opcional", fontWeight = FontWeight.Bold)
+                Text(suggestion.title)
+                Spacer(Modifier.height(4.dp))
+                Text(suggestion.reason, color = RehabianexColors.GrayText)
+                Spacer(Modifier.height(8.dp))
+                RehabianexOutlineButton("Abrir recursos breves") {
+                    onNavigate(Routes.Interventions)
+                }
+            }
+        }
         Spacer(Modifier.height(14.dp))
         RehabianexButton(
             text = if (isSaving) "Guardando..." else "Guardar registro",

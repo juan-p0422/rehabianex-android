@@ -43,6 +43,7 @@ object AgendaNotificationHelper {
     const val REMINDER_SOBER_DAY = "sober_day"
     const val REMINDER_ACHIEVEMENT = "achievement"
     const val REMINDER_MOTIVATIONAL = "motivational"
+    const val REMINDER_ADAPTIVE_INACTIVITY = "adaptive_inactivity"
     const val REMINDER_SUPERVISOR_SUMMARY = "supervisor_summary"
     const val REMINDER_SUPERVISOR_RELAPSE = "supervisor_relapse"
     const val REMINDER_SUPERVISOR_REQUESTS = "supervisor_requests"
@@ -124,6 +125,29 @@ object AgendaNotificationHelper {
             requestCode = appReminderRequestCode(actionKey),
             intent = intent,
             triggerAtMillis = nextDailyTriggerMillis(hour, minute),
+        )
+        return true
+    }
+
+    fun scheduleAdaptiveInactivityReminder(
+        context: Context,
+        triggerAtMillis: Long,
+    ): Boolean {
+        if (triggerAtMillis <= System.currentTimeMillis()) return false
+        val actionKey = REMINDER_ADAPTIVE_INACTIVITY
+        val intent = Intent(context, AgendaNotificationReceiver::class.java).apply {
+            putExtra(EXTRA_ACTION_TYPE, ACTION_GENERIC_REMINDER)
+            putExtra(EXTRA_NOTIFICATION_ID, appReminderNotificationId(actionKey))
+            putExtra(EXTRA_OPEN_NOTIFICATION_ROUTE, Routes.EmotionalCheckin)
+            putExtra(EXTRA_REPEAT_DAILY, false)
+            putExtra(EXTRA_ACTION_KEY, actionKey)
+            putExtra(EXTRA_EXPECTED_ROLE, NotificationScheduler.ROLE_PATIENT)
+        }
+        scheduleAlarm(
+            context = context,
+            requestCode = appReminderRequestCode(actionKey),
+            intent = intent,
+            triggerAtMillis = triggerAtMillis,
         )
         return true
     }

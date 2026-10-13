@@ -336,6 +336,22 @@ data class NotificationSettingsDto(
     val supervisorAlertsEnabled: Boolean? = null,
     @SerializedName("support_contact_alerts_enabled")
     val supportContactAlertsEnabled: Boolean? = null,
+    @SerializedName("adaptive_rules_available")
+    val adaptiveRulesAvailable: Boolean? = null,
+    @SerializedName("adaptive_rules_version")
+    val adaptiveRulesVersion: String? = null,
+    @SerializedName("adaptive_suggestions_enabled")
+    val adaptiveSuggestionsEnabled: Boolean? = null,
+    @SerializedName("inactivity_reminder_enabled")
+    val inactivityReminderEnabled: Boolean? = null,
+    @SerializedName("inactivity_days")
+    val inactivityDays: Int? = null,
+    @SerializedName("inactivity_reminder_time")
+    val inactivityReminderTime: String? = null,
+    @SerializedName("adaptive_craving_threshold")
+    val adaptiveCravingThreshold: Int? = null,
+    @SerializedName("adaptive_anxiety_threshold")
+    val adaptiveAnxietyThreshold: Int? = null,
     val timezone: String? = null,
     @SerializedName("created_at")
     val createdAt: String? = null,
@@ -372,6 +388,18 @@ data class SaveNotificationSettingsRequest(
     val supervisorAlertsEnabled: Boolean,
     @SerializedName("support_contact_alerts_enabled")
     val supportContactAlertsEnabled: Boolean,
+    @SerializedName("adaptive_suggestions_enabled")
+    val adaptiveSuggestionsEnabled: Boolean,
+    @SerializedName("inactivity_reminder_enabled")
+    val inactivityReminderEnabled: Boolean,
+    @SerializedName("inactivity_days")
+    val inactivityDays: Int,
+    @SerializedName("inactivity_reminder_time")
+    val inactivityReminderTime: String,
+    @SerializedName("adaptive_craving_threshold")
+    val adaptiveCravingThreshold: Int,
+    @SerializedName("adaptive_anxiety_threshold")
+    val adaptiveAnxietyThreshold: Int,
     val timezone: String = "America/Mexico_City",
 )
 
@@ -697,4 +725,28 @@ data class NotificationSettingsData(
     val cravingAlertsEnabled: Boolean = true,
     val supervisorAlertsEnabled: Boolean = true,
     val supportContactAlertsEnabled: Boolean = true,
-)
+    val adaptiveRulesAvailable: Boolean = false,
+    val adaptiveRulesVersion: String? = null,
+    val adaptiveSuggestionsEnabled: Boolean = false,
+    val inactivityReminderEnabled: Boolean = false,
+    val inactivityDays: Int = 3,
+    val inactivityReminderTime: String = "18:00",
+    val adaptiveCravingThreshold: Int = 8,
+    val adaptiveAnxietyThreshold: Int = 8,
+    val timezone: String = "America/Mexico_City",
+) {
+    companion object {
+        fun defaults() = NotificationSettingsData(
+            id = null,
+            dailyNoteEnabled = true,
+            dailyNoteTime = "20:00",
+            soberDayEnabled = true,
+            soberDayTime = "09:00",
+            achievementEnabled = true,
+            achievementTime = "09:30",
+            eventRemindersEnabled = true,
+            motivationalEnabled = false,
+            motivationalTime = "18:00",
+        )
+    }
+}

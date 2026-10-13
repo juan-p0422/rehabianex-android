@@ -32,6 +32,7 @@ import com.example.rehabianex.ui.components.ScreenHeader
 import com.example.rehabianex.ui.components.SettingSwitchCard
 import com.example.rehabianex.ui.components.SoftCard
 import com.example.rehabianex.ui.components.TimeSelector12h
+import com.example.rehabianex.ui.components.InputField
 import com.example.rehabianex.ui.components.formatTime12h
 import com.example.rehabianex.ui.theme.RehabianexColors
 import java.time.LocalDateTime
@@ -96,6 +97,10 @@ private fun NotificationsContent(
     var eventRemindersEnabled by rememberSaveable(settings.id) { mutableStateOf(settings.eventRemindersEnabled) }
     var motivationalEnabled by rememberSaveable(settings.id) { mutableStateOf(settings.motivationalEnabled) }
     var motivationalTime by rememberSaveable(settings.id) { mutableStateOf(settings.motivationalTime) }
+    var adaptiveSuggestionsEnabled by rememberSaveable(settings.id) { mutableStateOf(settings.adaptiveSuggestionsEnabled) }
+    var inactivityReminderEnabled by rememberSaveable(settings.id) { mutableStateOf(settings.inactivityReminderEnabled) }
+    var inactivityDays by rememberSaveable(settings.id) { mutableStateOf(settings.inactivityDays.toString()) }
+    var inactivityReminderTime by rememberSaveable(settings.id) { mutableStateOf(settings.inactivityReminderTime) }
     fun currentInput(): NotificationSettingsFormInput {
         return NotificationSettingsFormInput(
             dailyNoteEnabled = dailyNoteEnabled,
@@ -107,6 +112,10 @@ private fun NotificationsContent(
             eventRemindersEnabled = eventRemindersEnabled,
             motivationalEnabled = motivationalEnabled,
             motivationalTime = motivationalTime,
+            adaptiveSuggestionsEnabled = adaptiveSuggestionsEnabled,
+            inactivityReminderEnabled = inactivityReminderEnabled,
+            inactivityDays = inactivityDays,
+            inactivityReminderTime = inactivityReminderTime,
         )
     }
 
@@ -122,6 +131,15 @@ private fun NotificationsContent(
             eventRemindersEnabled = eventRemindersEnabled,
             motivationalEnabled = motivationalEnabled,
             motivationalTime = motivationalTime,
+            adaptiveRulesAvailable = settings.adaptiveRulesAvailable,
+            adaptiveRulesVersion = settings.adaptiveRulesVersion,
+            adaptiveSuggestionsEnabled = adaptiveSuggestionsEnabled,
+            inactivityReminderEnabled = inactivityReminderEnabled,
+            inactivityDays = inactivityDays.toIntOrNull() ?: settings.inactivityDays,
+            inactivityReminderTime = inactivityReminderTime,
+            adaptiveCravingThreshold = settings.adaptiveCravingThreshold,
+            adaptiveAnxietyThreshold = settings.adaptiveAnxietyThreshold,
+            timezone = settings.timezone,
         )
     }
 
@@ -268,6 +286,73 @@ private fun NotificationsContent(
             label = "Hora de mensaje motivacional",
             errorMessage = (saveState as? FormSaveUiState.Error)?.fieldErrors?.get("motivationalTime"),
         )
+    }
+    Spacer(Modifier.height(10.dp))
+    if (settings.adaptiveRulesAvailable) {
+        SoftCard {
+            Text("Apoyo adaptativo experimental", fontWeight = FontWeight.Bold)
+            Text(
+                "Es opcional y está desactivado inicialmente. Sus valores son de prueba, no umbrales clínicamente validados.",
+                color = RehabianexColors.GrayText,
+            )
+            Text("Versión: ${settings.adaptiveRulesVersion ?: "experimental"}")
+            Text("El valor de prueba 8/10 corresponde a 4/5 en el formulario.")
+        }
+        Spacer(Modifier.height(8.dp))
+        SettingSwitchCard(
+            title = "Sugerencia tras un registro",
+            description = if (adaptiveSuggestionsEnabled) {
+                "Ofrece como máximo un recurso breve y explica que se basa en tu autorreporte; no diagnostica ni predice recaídas."
+            } else {
+                "No se mostrarán sugerencias automáticas después de guardar."
+            },
+            checked = adaptiveSuggestionsEnabled,
+            onCheckedChange = {
+                adaptiveSuggestionsEnabled = it
+                onInputChanged()
+            },
+        )
+        Spacer(Modifier.height(8.dp))
+        SettingSwitchCard(
+            title = "Recordatorio por inactividad",
+            description = if (inactivityReminderEnabled) {
+                "Un aviso local y neutro por episodio. La falta de registros no se interpreta como recaída."
+            } else {
+                "No se enviarán recordatorios por falta de registros."
+            },
+            checked = inactivityReminderEnabled,
+            onCheckedChange = {
+                inactivityReminderEnabled = it
+                onInputChanged()
+            },
+        )
+        if (inactivityReminderEnabled) {
+            Spacer(Modifier.height(8.dp))
+            InputField(
+                value = inactivityDays,
+                onValueChange = {
+                    inactivityDays = it.filter(Char::isDigit).take(2)
+                    onInputChanged()
+                },
+                label = "Días sin registro (2 a 14)",
+                errorMessage = (saveState as? FormSaveUiState.Error)?.fieldErrors?.get("inactivityDays"),
+            )
+            Spacer(Modifier.height(8.dp))
+            TimeSelector12h(
+                value = inactivityReminderTime,
+                onValueChange = {
+                    inactivityReminderTime = it
+                    onInputChanged()
+                },
+                label = "Hora del recordatorio opcional",
+                errorMessage = (saveState as? FormSaveUiState.Error)?.fieldErrors?.get("inactivityReminderTime"),
+            )
+        }
+    } else {
+        SoftCard {
+            Text("Apoyo adaptativo no disponible", fontWeight = FontWeight.Bold)
+            Text("La función permanece desactivada por configuración y no programa avisos.")
+        }
     }
     Spacer(Modifier.height(12.dp))
     NotificationSaveMessage(saveState)

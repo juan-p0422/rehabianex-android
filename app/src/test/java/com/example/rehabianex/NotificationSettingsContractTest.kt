@@ -76,6 +76,11 @@ class NotificationSettingsContractTest {
         assertFalse(savedRequests.single().cravingAlertsEnabled)
         assertTrue(savedRequests.single().supervisorAlertsEnabled)
         assertFalse(savedRequests.single().supportContactAlertsEnabled)
+        assertFalse(savedRequests.single().adaptiveSuggestionsEnabled)
+        assertFalse(savedRequests.single().inactivityReminderEnabled)
+        assertEquals(3, savedRequests.single().inactivityDays)
+        assertEquals(8, savedRequests.single().adaptiveCravingThreshold)
+        assertEquals(8, savedRequests.single().adaptiveAnxietyThreshold)
     }
 
     @Test
@@ -111,6 +116,9 @@ class NotificationSettingsContractTest {
         assertFalse(requestJson.contains("supervisor_uid"))
         assertFalse(requestJson.contains("user_uid"))
         assertEquals(NOTIFICATION_TIMEZONE, requests.single().timezone)
+        assertTrue(requestJson.contains("adaptive_suggestions_enabled"))
+        assertTrue(requestJson.contains("inactivity_reminder_enabled"))
+        assertFalse(requestJson.contains("adaptive_rules_available"))
     }
 
     @Test

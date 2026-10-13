@@ -9,6 +9,9 @@ interface PatientNoteDao {
     @Query("SELECT * FROM patient_notes WHERE ownerUid = :ownerUid AND deletedAt IS NULL ORDER BY createdAt DESC")
     suspend fun activeForOwner(ownerUid: String): List<PatientNoteEntity>
 
+    @Query("SELECT * FROM patient_notes WHERE ownerUid = :ownerUid AND deletedAt IS NULL ORDER BY createdAt DESC LIMIT 1")
+    suspend fun latestActiveForOwner(ownerUid: String): PatientNoteEntity?
+
     @Query("""
         SELECT * FROM patient_notes
         WHERE ownerUid = :ownerUid

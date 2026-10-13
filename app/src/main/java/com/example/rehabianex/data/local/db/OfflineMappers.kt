@@ -252,6 +252,14 @@ fun NotificationSettingsDto.toEntity(ownerUid: String, syncedAt: Long): Notifica
         cravingAlertsEnabled = cravingAlertsEnabled ?: true,
         supervisorAlertsEnabled = supervisorAlertsEnabled ?: true,
         supportContactAlertsEnabled = supportContactAlertsEnabled ?: true,
+        adaptiveRulesAvailable = adaptiveRulesAvailable ?: false,
+        adaptiveRulesVersion = adaptiveRulesVersion,
+        adaptiveSuggestionsEnabled = adaptiveSuggestionsEnabled ?: false,
+        inactivityReminderEnabled = inactivityReminderEnabled ?: false,
+        inactivityDays = inactivityDays?.coerceIn(2, 14) ?: 3,
+        inactivityReminderTime = inactivityReminderTime.cleanTime() ?: "18:00",
+        adaptiveCravingThreshold = adaptiveCravingThreshold?.coerceIn(6, 10) ?: 8,
+        adaptiveAnxietyThreshold = adaptiveAnxietyThreshold?.coerceIn(6, 10) ?: 8,
         timezone = timezone?.takeIf(String::isNotBlank) ?: "America/Mexico_City",
         lastSyncedAt = syncedAt,
     )
@@ -271,6 +279,15 @@ fun NotificationSettingsEntity.toUi(): NotificationSettingsData = NotificationSe
     cravingAlertsEnabled = cravingAlertsEnabled,
     supervisorAlertsEnabled = supervisorAlertsEnabled,
     supportContactAlertsEnabled = supportContactAlertsEnabled,
+    adaptiveRulesAvailable = adaptiveRulesAvailable,
+    adaptiveRulesVersion = adaptiveRulesVersion,
+    adaptiveSuggestionsEnabled = adaptiveSuggestionsEnabled,
+    inactivityReminderEnabled = inactivityReminderEnabled,
+    inactivityDays = inactivityDays,
+    inactivityReminderTime = inactivityReminderTime,
+    adaptiveCravingThreshold = adaptiveCravingThreshold,
+    adaptiveAnxietyThreshold = adaptiveAnxietyThreshold,
+    timezone = timezone,
 )
 
 fun NotificationSettingsData.toEntity(
@@ -292,7 +309,15 @@ fun NotificationSettingsData.toEntity(
     cravingAlertsEnabled = cravingAlertsEnabled,
     supervisorAlertsEnabled = supervisorAlertsEnabled,
     supportContactAlertsEnabled = supportContactAlertsEnabled,
-    timezone = "America/Mexico_City",
+    adaptiveRulesAvailable = adaptiveRulesAvailable,
+    adaptiveRulesVersion = adaptiveRulesVersion,
+    adaptiveSuggestionsEnabled = adaptiveSuggestionsEnabled,
+    inactivityReminderEnabled = inactivityReminderEnabled,
+    inactivityDays = inactivityDays,
+    inactivityReminderTime = inactivityReminderTime,
+    adaptiveCravingThreshold = adaptiveCravingThreshold,
+    adaptiveAnxietyThreshold = adaptiveAnxietyThreshold,
+    timezone = timezone,
     lastSyncedAt = syncedAt,
 )
 

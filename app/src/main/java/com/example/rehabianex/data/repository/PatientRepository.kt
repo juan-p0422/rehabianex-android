@@ -1,6 +1,7 @@
 package com.example.rehabianex.data.repository
 
 import com.example.rehabianex.core.error.ErrorMapper
+import com.example.rehabianex.adaptive.AdaptiveSuggestion
 import com.example.rehabianex.core.session.SessionManager
 import com.example.rehabianex.core.session.SessionInvalidationBus
 import com.example.rehabianex.core.session.SessionRefreshCoordinator
@@ -94,6 +95,8 @@ class PatientRepository(
     private val database: RehabiAnexDatabase? = null,
     private val networkStatusProvider: NetworkStatusProvider? = null,
     private val schedulePendingSync: ((String) -> Unit)? = null,
+    private val onAdaptiveNoteSaved: (suspend (CreatePatientNoteRequest) -> AdaptiveSuggestion?)? = null,
+    private val onNotificationSettingsSaved: (suspend (NotificationSettingsData) -> Unit)? = null,
     private val sessionRefreshCoordinator: SessionRefreshCoordinator =
         SessionRefreshCoordinator(apiService, sessionManager),
 ) {
@@ -145,6 +148,10 @@ class PatientRepository(
         }
         }
     }
+
+    suspend fun handleAdaptiveNoteSaved(
+        request: CreatePatientNoteRequest,
+    ): AdaptiveSuggestion? = onAdaptiveNoteSaved?.invoke(request)
 
     suspend fun loadCachedHomeData(): PatientDataResult.Success<PatientHomeData>? {
         val uid = sessionUid()
@@ -1125,6 +1132,7 @@ class PatientRepository(
                 body?.data?.toEntity(uid, syncedAt) ?: saved.toEntity(uid, syncedAt),
             )
             markSynced(uid, NOTIFICATIONS_RESOURCE, syncedAt)
+            onNotificationSettingsSaved?.invoke(saved)
             saved
         } else {
             throw EarlyFailureException(
@@ -2290,6 +2298,29 @@ class PatientRepository(
             supportContactAlertsEnabled = this?.supportContactAlertsEnabled
                 ?: fallback?.supportContactAlertsEnabled
                 ?: true,
+            adaptiveRulesAvailable = this?.adaptiveRulesAvailable ?: false,
+            adaptiveRulesVersion = this?.adaptiveRulesVersion
+                ?: fallback?.adaptiveRulesVersion,
+            adaptiveSuggestionsEnabled = this?.adaptiveSuggestionsEnabled
+                ?: fallback?.adaptiveSuggestionsEnabled
+                ?: false,
+            inactivityReminderEnabled = this?.inactivityReminderEnabled
+                ?: fallback?.inactivityReminderEnabled
+                ?: false,
+            inactivityDays = (this?.inactivityDays ?: fallback?.inactivityDays ?: 3)
+                .coerceIn(2, 14),
+            inactivityReminderTime = this?.inactivityReminderTime.cleanTimeOrDefault(
+                fallback?.inactivityReminderTime ?: "18:00",
+            ),
+            adaptiveCravingThreshold = (this?.adaptiveCravingThreshold
+                ?: fallback?.adaptiveCravingThreshold
+                ?: 8).coerceIn(6, 10),
+            adaptiveAnxietyThreshold = (this?.adaptiveAnxietyThreshold
+                ?: fallback?.adaptiveAnxietyThreshold
+                ?: 8).coerceIn(6, 10),
+            timezone = this?.timezone?.takeIf(String::isNotBlank)
+                ?: fallback?.timezone
+                ?: NOTIFICATION_TIMEZONE,
         )
     }
 
@@ -2316,7 +2347,13 @@ class PatientRepository(
             cravingAlertsEnabled = cravingAlertsEnabled,
             supervisorAlertsEnabled = supervisorAlertsEnabled,
             supportContactAlertsEnabled = supportContactAlertsEnabled,
-            timezone = NOTIFICATION_TIMEZONE,
+            adaptiveSuggestionsEnabled = adaptiveSuggestionsEnabled,
+            inactivityReminderEnabled = inactivityReminderEnabled,
+            inactivityDays = inactivityDays.coerceIn(2, 14),
+            inactivityReminderTime = inactivityReminderTime.cleanTimeOrDefault("18:00"),
+            adaptiveCravingThreshold = adaptiveCravingThreshold.coerceIn(6, 10),
+            adaptiveAnxietyThreshold = adaptiveAnxietyThreshold.coerceIn(6, 10),
+            timezone = timezone.takeIf(String::isNotBlank) ?: NOTIFICATION_TIMEZONE,
         )
     }
 

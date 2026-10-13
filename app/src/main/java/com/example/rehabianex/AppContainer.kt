@@ -19,6 +19,7 @@ import com.example.rehabianex.data.repository.SupervisorRepository
 import com.example.rehabianex.data.repository.FcmDemoRepository
 import com.example.rehabianex.session.SecureSessionManager
 import com.example.rehabianex.sync.PatientSyncWorker
+import com.example.rehabianex.adaptive.AdaptiveSupportManager
 import com.example.rehabianex.notifications.FcmTokenManager
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -33,6 +34,7 @@ class AppContainer(context: Context) {
     val fcmTokenManager = FcmTokenManager(applicationContext, apiService, sessionManager)
     private val database = RehabiAnexDatabase.getInstance(applicationContext)
     private val networkStatusProvider = AndroidNetworkStatusProvider(applicationContext)
+    val adaptiveSupportManager = AdaptiveSupportManager(applicationContext, database, sessionManager)
     private val patientIdentityStore = PatientIdentityStore(context)
     private val supervisorNotificationSettingsStore = SupervisorNotificationSettingsStore(context)
     val dataExportFileManager = DataExportFileManager(applicationContext)
@@ -54,6 +56,8 @@ class AppContainer(context: Context) {
         schedulePendingSync = { ownerUid ->
             PatientSyncWorker.enqueue(applicationContext, ownerUid)
         },
+        onAdaptiveNoteSaved = adaptiveSupportManager::onNoteSaved,
+        onNotificationSettingsSaved = adaptiveSupportManager::scheduleInactivity,
         sessionRefreshCoordinator = sessionRefreshCoordinator,
     )
 
@@ -79,6 +83,7 @@ class AppContainer(context: Context) {
         sessionManager = sessionManager,
         clearLocalUserData = { uid, role ->
             offlineDataCleanupCoordinator.clearAfterConfirmedLogout(uid, role)
+            adaptiveSupportManager.clearOwnerState(uid)
             dataExportFileManager.clearExports()
         },
         sessionRefreshCoordinator = sessionRefreshCoordinator,
@@ -89,11 +94,13 @@ class AppContainer(context: Context) {
         sessionManager = sessionManager,
         clearLocalUserData = { uid, role ->
             offlineDataCleanupCoordinator.clearAfterConfirmedLogout(uid, role)
+            adaptiveSupportManager.clearOwnerState(uid)
             dataExportFileManager.clearExports()
         },
         pendingLocalNotesCount = offlineDataCleanupCoordinator::pendingPatientNotes,
         clearPreviousUserData = { uid, role ->
             offlineDataCleanupCoordinator.clearForUserSwitch(uid, role)
+            adaptiveSupportManager.clearOwnerState(uid)
             dataExportFileManager.clearExports()
         },
         restrictPrivatePatientIdentity = patientRepository::restrictPrivateIdentityFromLogin,

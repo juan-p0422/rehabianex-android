@@ -146,6 +146,7 @@ object NotificationScheduler {
         AgendaNotificationHelper.REMINDER_SOBER_DAY,
         AgendaNotificationHelper.REMINDER_ACHIEVEMENT,
         AgendaNotificationHelper.REMINDER_MOTIVATIONAL,
+        AgendaNotificationHelper.REMINDER_ADAPTIVE_INACTIVITY,
     )
     private val SUPERVISOR_REMINDERS = setOf(
         AgendaNotificationHelper.REMINDER_SUPERVISOR_SUMMARY,

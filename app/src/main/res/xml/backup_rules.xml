@@ -10,6 +10,7 @@
     <exclude domain="sharedpref" path="patient_identity.xml"/>
     <exclude domain="sharedpref" path="supervisor_notification_settings.xml"/>
     <exclude domain="sharedpref" path="rehabianex_notifications.xml"/>
+    <exclude domain="sharedpref" path="adaptive_support_state.xml"/>
     <exclude domain="sharedpref" path="rehabianex_fcm_lifecycle.xml"/>
     <exclude domain="sharedpref" path="rehabianex_fcm_delivery_state.xml"/>
     <exclude domain="database" path="rehabianex-offline.db"/>

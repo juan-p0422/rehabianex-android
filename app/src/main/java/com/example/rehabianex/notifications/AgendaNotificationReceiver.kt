@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.example.rehabianex.AppContainer
+import com.example.rehabianex.adaptive.AdaptiveSupportPolicy
 import com.example.rehabianex.data.repository.PatientDataResult
 import com.example.rehabianex.data.repository.SupervisorDataResult
 import com.example.rehabianex.navigation.Routes
@@ -34,6 +35,8 @@ class AgendaNotificationReceiver : BroadcastReceiver() {
 
                 when (actionKey) {
                     AgendaNotificationHelper.REMINDER_ACHIEVEMENT -> checkAchievements(context, intent)
+                    AgendaNotificationHelper.REMINDER_ADAPTIVE_INACTIVITY ->
+                        checkAdaptiveInactivity(context, intent)
                     AgendaNotificationHelper.REMINDER_SUPERVISOR_SUMMARY ->
                         checkSupervisorReminder(context, intent)
                     else -> showGenericReminder(context, intent)
@@ -44,6 +47,31 @@ class AgendaNotificationReceiver : BroadcastReceiver() {
                     showEventReminder(context, intent)
                 }
             }
+        }
+    }
+
+    private fun checkAdaptiveInactivity(context: Context, intent: Intent) {
+        val pendingResult = goAsync()
+        val appContext = context.applicationContext
+        val notificationId = intent.getIntExtra(
+            AgendaNotificationHelper.EXTRA_NOTIFICATION_ID,
+            1,
+        )
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                val manager = AppContainer(appContext).adaptiveSupportManager
+                if (manager.shouldShowInactivityReminder()) {
+                    val shown = AgendaNotificationHelper.showGenericNotification(
+                        context = appContext,
+                        notificationId = notificationId,
+                        title = NEUTRAL_TITLE,
+                        message = AdaptiveSupportPolicy.INACTIVITY_REMINDER_MESSAGE,
+                        route = Routes.EmotionalCheckin,
+                    )
+                    if (shown) manager.markInactivityReminderDelivered()
+                }
+            }
+            pendingResult.finish()
         }
     }
 
