@@ -21,6 +21,7 @@ import com.example.rehabianex.data.model.SessionProfileDto
 import com.example.rehabianex.data.model.SupervisionRequestDto
 import com.example.rehabianex.data.model.SupervisorChatData
 import com.example.rehabianex.data.model.SupervisorChatMessage
+import com.example.rehabianex.data.model.SupervisorChatPeriod
 import com.example.rehabianex.data.model.SupervisorChatRequest
 import com.example.rehabianex.data.model.SupervisorHomeData
 import com.example.rehabianex.data.model.SupervisorNoteItem
@@ -553,7 +554,8 @@ class SupervisorRepository(
         }
 
         if (response.isSuccessful) {
-            val answer = response.body()?.answer.cleanText(maxLength = 3000)
+            val body = response.body()
+            val answer = body?.answer.cleanText(maxLength = 3000)
                 ?: throw EarlyFailureException(
                     SupervisorDataResult.Failure(
                         "El asistente no devolvió una respuesta. Inténtalo nuevamente.",
@@ -562,16 +564,31 @@ class SupervisorRepository(
             SupervisorChatMessage(
                 text = answer.toReadableAiAnswer(),
                 fromUser = false,
-                responseMode = response.body()?.mode.cleanText(maxLength = 32)
+                responseMode = body?.mode.cleanText(maxLength = 32)
                     ?.lowercase(Locale.ROOT)
                     ?.takeIf { it in VALID_AI_CHAT_RESPONSE_MODES }
                     ?: requestedMode,
+                periodLabel = body?.context?.period?.readableLabel(),
+                dataLimits = body?.context?.dataLimits.orEmpty()
+                    .mapNotNull { it.cleanText(maxLength = 180) }
+                    .distinct()
+                    .take(5),
+                quotaRemaining = body?.quota?.remaining?.coerceAtLeast(0),
+                quotaLimit = body?.quota?.limit?.coerceAtLeast(1),
             )
         } else {
             throw EarlyFailureException(
                 SupervisorDataResult.Failure(response.chatErrorMessage(), response.code()),
             )
         }
+    }
+
+    private fun SupervisorChatPeriod.readableLabel(): String? {
+        val start = startDate.cleanText(maxLength = 32)
+        val end = endDate.cleanText(maxLength = 32)
+        if (start != null && end != null) return "$start a $end"
+
+        return label.cleanText(maxLength = 160)
     }
 
     private suspend fun loadAiChatEligiblePatientsCount(

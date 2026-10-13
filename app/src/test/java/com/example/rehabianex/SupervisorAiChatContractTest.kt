@@ -13,6 +13,9 @@ import com.example.rehabianex.data.model.SupervisedPatientsResponse
 import com.example.rehabianex.data.model.SupervisorChatEligibilityResponse
 import com.example.rehabianex.data.model.SupervisorChatRequest
 import com.example.rehabianex.data.model.SupervisorChatResponse
+import com.example.rehabianex.data.model.SupervisorChatContext
+import com.example.rehabianex.data.model.SupervisorChatPeriod
+import com.example.rehabianex.data.model.SupervisorChatQuota
 import com.example.rehabianex.data.model.SupervisorPatientDto
 import com.example.rehabianex.data.model.SupervisorPatientPermissionsDto
 import com.example.rehabianex.data.model.TokenData
@@ -39,6 +42,13 @@ class SupervisorAiChatContractTest {
 
         assertEquals("Pregunta sensible", sanitized)
         assertTrue("x".repeat(MAX_AI_CHAT_QUESTION_LENGTH + 1).sanitizeAiChatQuestion().length > MAX_AI_CHAT_QUESTION_LENGTH)
+    }
+
+    @Test
+    fun questionPolicyPreservesNormalSpacesAndAccents() {
+        val sanitized = "¿Qué cambió en la última sesión de apoyo?".sanitizeAiChatQuestion()
+
+        assertEquals("¿Qué cambió en la última sesión de apoyo?", sanitized)
     }
 
     @Test
@@ -226,6 +236,38 @@ class SupervisorAiChatContractTest {
 
         assertEquals("fallback_local", result.data.responseMode)
         assertTrue(result.data.text.contains("Respuesta local segura"))
+    }
+
+    @Test
+    fun responseKeepsOptionalPeriodDataLimitsAndPerSupervisorQuota() = runTest {
+        val repository = repository(
+            activeChatHandler {
+                Response.success(
+                    SupervisorChatResponse(
+                        answer = "Resumen seguro.",
+                        mode = "ai",
+                        context = SupervisorChatContext(
+                            period = SupervisorChatPeriod(
+                                startDate = "2026-10-06",
+                                endDate = "2026-10-12",
+                                timezone = "America/Mexico_City",
+                                label = "Últimos 7 días naturales",
+                            ),
+                            dataLimits = listOf("Solo hay dos registros autorreportados."),
+                        ),
+                        quota = SupervisorChatQuota(limit = 50, remaining = 49),
+                    ),
+                )
+            },
+        )
+
+        val result = repository.askSupervisorChat("Resume los registros de esta semana")
+            as SupervisorDataResult.Success
+
+        assertEquals("2026-10-06 a 2026-10-12", result.data.periodLabel)
+        assertEquals(listOf("Solo hay dos registros autorreportados."), result.data.dataLimits)
+        assertEquals(49, result.data.quotaRemaining)
+        assertEquals(50, result.data.quotaLimit)
     }
 
     @Test

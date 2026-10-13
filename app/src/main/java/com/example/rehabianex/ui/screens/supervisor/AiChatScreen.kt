@@ -13,9 +13,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -30,13 +29,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.example.rehabianex.data.model.SupervisorChatMessage
 import com.example.rehabianex.core.validation.MAX_AI_CHAT_QUESTION_LENGTH
@@ -65,6 +67,13 @@ fun AiChatScreen(
         data?.authorized == false -> "Tu cuenta de supervisor está pendiente de autorización. Un administrador revisará tu información antes de habilitar el Chat IA."
         data?.patientsCount == 0 -> "Aún no tienes pacientes con permiso activo. El chat estará disponible cuando tengas al menos un paciente vinculado."
         else -> "Hola, soy el asistente de RehabiAnex. ¿Qué deseas analizar hoy?"
+    }
+    val conversationScrollState = rememberScrollState()
+
+    LaunchedEffect(conversationScrollState.maxValue) {
+        if (messages.isNotEmpty() || uiState.sending || uiState.errorMessage != null) {
+            conversationScrollState.animateScrollTo(conversationScrollState.maxValue)
+        }
     }
 
     Scaffold(
@@ -95,7 +104,7 @@ fun AiChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(conversationScrollState)
                 .padding(horizontal = 12.dp, vertical = 12.dp),
         ) {
             if (uiState.isRefreshing) {
@@ -139,7 +148,10 @@ fun AiChatScreen(
                 }
             if (uiState.sending) {
                 Spacer(Modifier.height(8.dp))
-                AssistantBubble("Analizando registros autorizados...")
+                AssistantBubble(
+                    text = "Analizando registros autorizados...",
+                    announceChanges = true,
+                )
             }
             if (data == null && uiState.errorMessage != null) {
                 Spacer(Modifier.height(12.dp))
@@ -199,27 +211,21 @@ private fun ChatInputBar(
         modifier = Modifier.fillMaxWidth(),
         color = RehabianexColors.GreenVerySoft,
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .imePadding()
                 .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             OutlinedTextField(
                 value = value,
                 onValueChange = onValueChange,
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Escribe tu pregunta") },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("Escribe tu pregunta con el contexto necesario") },
                 enabled = enabled,
-                singleLine = true,
+                minLines = 2,
+                maxLines = 5,
                 shape = RoundedCornerShape(2.dp),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(
-                    onSend = {
-                        if (canSend) onSend()
-                    },
-                ),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = Color.White,
                     unfocusedContainerColor = Color.White,
@@ -235,6 +241,7 @@ private fun ChatInputBar(
             Button(
                 onClick = onSend,
                 enabled = canSend,
+                modifier = Modifier.align(Alignment.End),
                 shape = RoundedCornerShape(24.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = RehabianexColors.GreenMain,
@@ -249,18 +256,31 @@ private fun ChatInputBar(
 }
 
 @Composable
-private fun AssistantBubble(text: String) {
+private fun AssistantBubble(
+    text: String,
+    announceChanges: Boolean = false,
+) {
     Surface(
-        modifier = Modifier.fillMaxWidth(0.78f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (announceChanges) {
+                    Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                } else {
+                    Modifier
+                },
+            ),
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
         border = BorderStroke(1.dp, RehabianexColors.GrayBorder),
     ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(14.dp),
-            color = RehabianexColors.Black,
-        )
+        SelectionContainer {
+            Text(
+                text = text,
+                modifier = Modifier.padding(14.dp),
+                color = RehabianexColors.Black,
+            )
+        }
     }
 }
 
@@ -298,10 +318,36 @@ private fun ChatMessageBubble(message: SupervisorChatMessage) {
                     )
                     Spacer(Modifier.height(4.dp))
                 }
-                Text(
-                    text = message.text,
-                    color = if (message.fromUser) Color.White else RehabianexColors.Black,
-                )
+                SelectionContainer {
+                    Text(
+                        text = message.text,
+                        color = if (message.fromUser) Color.White else RehabianexColors.Black,
+                    )
+                }
+                if (!message.fromUser && message.periodLabel != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Periodo del resumen: ${message.periodLabel}",
+                        color = RehabianexColors.GrayText,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                if (!message.fromUser && message.dataLimits.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Limitaciones de los datos: ${message.dataLimits.joinToString(" · ")}",
+                        color = RehabianexColors.GrayText,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                if (!message.fromUser && message.quotaRemaining != null && message.quotaLimit != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Consultas IA disponibles en 24 h: ${message.quotaRemaining} de ${message.quotaLimit}",
+                        color = RehabianexColors.GrayText,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         }
     }
@@ -346,7 +392,7 @@ private fun SuggestionRow(onInputChanged: (String) -> Unit) {
     val suggestions = listOf(
         "Ansiedad alta" to "¿Quién tuvo ansiedad alta esta semana y qué seguimiento recomiendas?",
         "Recaídas" to "¿Algún paciente registró recaída o señales de riesgo alto?",
-        "Sin actividad" to "¿Quién no ha registrado actividad recientemente?",
+        "Registros escasos" to "¿Qué pacientes tienen pocos registros recientes, sin inferir recaída por inactividad?",
     )
 
     Row(

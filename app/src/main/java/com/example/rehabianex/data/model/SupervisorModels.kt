@@ -110,6 +110,9 @@ data class SupervisorChatResponse(
     @SerializedName("session_id")
     val sessionId: String? = null,
     val context: SupervisorChatContext? = null,
+    val quota: SupervisorChatQuota? = null,
+    @SerializedName("retry_after_seconds")
+    val retryAfterSeconds: Int? = null,
 )
 
 data class SupervisorChatEligibilityResponse(
@@ -126,6 +129,26 @@ data class SupervisorChatContext(
     val authorizedPatientsCount: Int? = null,
     @SerializedName("notes_count")
     val notesCount: Int? = null,
+    val period: SupervisorChatPeriod? = null,
+    @SerializedName("data_limits")
+    val dataLimits: List<String>? = null,
+)
+
+data class SupervisorChatPeriod(
+    @SerializedName("start_date")
+    val startDate: String? = null,
+    @SerializedName("end_date")
+    val endDate: String? = null,
+    val timezone: String? = null,
+    val label: String? = null,
+)
+
+data class SupervisorChatQuota(
+    val limit: Int? = null,
+    val remaining: Int? = null,
+    @SerializedName("reset_at")
+    val resetAt: String? = null,
+    val window: String? = null,
 )
 
 data class SupervisorPatientSummary(
@@ -237,4 +260,8 @@ data class SupervisorChatMessage(
     val text: String,
     val fromUser: Boolean,
     val responseMode: String? = null,
+    val periodLabel: String? = null,
+    val dataLimits: List<String> = emptyList(),
+    val quotaRemaining: Int? = null,
+    val quotaLimit: Int? = null,
 )
