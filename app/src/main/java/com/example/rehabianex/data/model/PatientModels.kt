@@ -50,6 +50,28 @@ data class SessionProfileDto(
     @SerializedName("sobriety_start_date")
     val sobrietyStartDate: String? = null,
     val supervisor: SupervisorPublicDto? = null,
+    @SerializedName("legal_acceptance")
+    val legalAcceptance: LegalAcceptanceDto? = null,
+    @SerializedName("privacy_notice_read")
+    val privacyNoticeRead: PrivacyNoticeReadDto? = null,
+)
+
+data class LegalAcceptanceDto(
+    @SerializedName("privacy_notice_version")
+    val privacyNoticeVersion: String? = null,
+    @SerializedName("accepted_at")
+    val acceptedAt: String? = null,
+    val status: String? = null,
+)
+
+data class PrivacyNoticeReadDto(
+    @SerializedName("privacy_notice_version")
+    val privacyNoticeVersion: String? = null,
+    @SerializedName("confirmed_at")
+    val confirmedAt: String? = null,
+    val status: String? = null,
+    @SerializedName("is_current")
+    val isCurrent: Boolean? = null,
 )
 
 data class ResourceListResponse<T>(

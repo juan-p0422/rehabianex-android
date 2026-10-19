@@ -135,6 +135,10 @@ fun SupervisorProfileScreen(
                 RehabianexOutlineButton("Control de datos") {
                     onNavigate(Routes.DataControl)
                 }
+                Spacer(Modifier.height(8.dp))
+                RehabianexOutlineButton("Aviso de privacidad") {
+                    onNavigate(Routes.PrivacyNotice)
+                }
                 Spacer(Modifier.height(16.dp))
                 RehabianexDangerButton("Cerrar sesión", onClick = onLogout)
             }

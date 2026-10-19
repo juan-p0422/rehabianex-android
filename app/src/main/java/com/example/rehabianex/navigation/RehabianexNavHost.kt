@@ -36,6 +36,7 @@ import com.example.rehabianex.data.repository.AdminRepository
 import com.example.rehabianex.data.repository.AuthRepository
 import com.example.rehabianex.data.repository.DataControlRepository
 import com.example.rehabianex.data.repository.PatientRepository
+import com.example.rehabianex.data.repository.PrivacyNoticeRepository
 import com.example.rehabianex.data.repository.SupervisorRepository
 import com.example.rehabianex.data.repository.FcmDemoRepository
 import com.example.rehabianex.data.export.DataExportFileManager
@@ -54,6 +55,9 @@ import com.example.rehabianex.ui.screens.data.DataControlScreen
 import com.example.rehabianex.ui.screens.data.DataControlViewModel
 import com.example.rehabianex.ui.screens.notifications.FcmDemoScreen
 import com.example.rehabianex.ui.screens.notifications.FcmDemoViewModel
+import com.example.rehabianex.ui.screens.privacy.PrivacyNoticeScreen
+import com.example.rehabianex.ui.screens.privacy.PrivacyNoticeUiState
+import com.example.rehabianex.ui.screens.privacy.PrivacyNoticeViewModel
 import com.example.rehabianex.validation.LoginFormInput
 import kotlinx.coroutines.launch
 
@@ -61,6 +65,7 @@ import kotlinx.coroutines.launch
 fun RehabianexNavHost(
     adminRepository: AdminRepository,
     authRepository: AuthRepository,
+    privacyNoticeRepository: PrivacyNoticeRepository,
     dataControlRepository: DataControlRepository,
     dataExportFileManager: DataExportFileManager,
     patientRepository: PatientRepository,
@@ -75,7 +80,7 @@ fun RehabianexNavHost(
     val startDestination = remember(sessionManager) {
         val hasSession = sessionManager.hasActiveSession()
 
-        activeSessionHomeRoute(hasSession, sessionManager.getRole()) ?: Routes.Splash
+        if (hasSession) Routes.PrivacyGate else Routes.Splash
     }
     var authInfoMessage by rememberSaveable {
         mutableStateOf<String?>(null)
@@ -83,6 +88,8 @@ fun RehabianexNavHost(
     val coroutineScope = rememberCoroutineScope()
     var pendingLogoutNotesCount by rememberSaveable { mutableStateOf<Int?>(null) }
     var logoutInProgress by rememberSaveable { mutableStateOf(false) }
+    var privacyAccessGranted by rememberSaveable { mutableStateOf(false) }
+    var postRegistrationRole by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun beginLogout(confirmPendingNotesDeletion: Boolean) {
         if (logoutInProgress) return
@@ -94,6 +101,7 @@ fun RehabianexNavHost(
                     pendingLogoutNotesCount = result.pendingNotesCount
                 } else {
                     authInfoMessage = result.message
+                    privacyAccessGranted = false
                     navController.returnToLogin()
                 }
             } finally {
@@ -131,10 +139,9 @@ fun RehabianexNavHost(
             LaunchedEffect(success) {
                 success?.let {
                     authViewModel.clearState()
-                    NotificationRescheduleWorker.enqueue(context)
-                    val destination = homeRouteForRole(it.session.role)
-                        ?: return@let
-                    navController.navigate(destination) {
+                    postRegistrationRole = null
+                    privacyAccessGranted = false
+                    navController.navigate(Routes.PrivacyGate) {
                         popUpTo(Routes.Login) {
                             inclusive = true
                         }
@@ -170,11 +177,9 @@ fun RehabianexNavHost(
             LaunchedEffect(success) {
                 success?.let {
                     authViewModel.clearState()
-                    val destination = postRegistrationRoute(it.session.role) ?: Routes.Login
-                    if (destination != Routes.Consent) {
-                        NotificationRescheduleWorker.enqueue(context)
-                    }
-                    navController.navigate(destination) {
+                    postRegistrationRole = it.session.role
+                    privacyAccessGranted = false
+                    navController.navigate(Routes.PrivacyGate) {
                         popUpTo(Routes.Register) {
                             inclusive = true
                         }
@@ -200,6 +205,64 @@ fun RehabianexNavHost(
                 },
                 uiState = uiState,
                 onInputChanged = authViewModel::clearState,
+                onPrivacyNoticeClick = { navController.navigate(Routes.PrivacyNotice) },
+            )
+        }
+        composable(Routes.PrivacyGate) {
+            val privacyViewModel: PrivacyNoticeViewModel = viewModel(
+                factory = PrivacyNoticeViewModel.Factory(
+                    repository = privacyNoticeRepository,
+                    confirmationRequired = true,
+                ),
+            )
+            val privacyState by privacyViewModel.uiState.collectAsStateWithLifecycle()
+            LaunchedEffect(privacyState) {
+                if (privacyState is PrivacyNoticeUiState.AccessGranted) {
+                    NotificationRescheduleWorker.enqueue(context)
+                    coroutineScope.launch {
+                        authRepository.registerNotificationsAfterPrivacyGate()
+                    }
+                    val role = sessionManager.getRole()
+                    val requestedDestination = requestedRoute?.takeIf {
+                        notificationRouteAllowed(role, it)
+                    }
+                    val destination = requestedDestination ?: if (postRegistrationRole == "patient") {
+                        Routes.Consent
+                    } else {
+                        homeRouteForRole(role) ?: Routes.Login
+                    }
+                    if (requestedRoute != null) onRouteRequestConsumed()
+                    postRegistrationRole = null
+                    navController.navigate(destination) {
+                        popUpTo(Routes.PrivacyGate) { inclusive = true }
+                    }
+                    privacyAccessGranted = true
+                }
+            }
+            PrivacyNoticeScreen(
+                uiState = privacyState,
+                confirmationRequired = true,
+                onConfirm = privacyViewModel::confirmRead,
+                onRetry = privacyViewModel::load,
+                onBack = {},
+                onLogout = logout,
+            )
+        }
+        composable(Routes.PrivacyNotice) {
+            val privacyViewModel: PrivacyNoticeViewModel = viewModel(
+                factory = PrivacyNoticeViewModel.Factory(
+                    repository = privacyNoticeRepository,
+                    confirmationRequired = false,
+                ),
+            )
+            val privacyState by privacyViewModel.uiState.collectAsStateWithLifecycle()
+            PrivacyNoticeScreen(
+                uiState = privacyState,
+                confirmationRequired = false,
+                onConfirm = {},
+                onRetry = privacyViewModel::load,
+                onBack = { navController.popBackStack() },
+                onLogout = logout,
             )
         }
         composable(Routes.Consent) {
@@ -334,15 +397,19 @@ fun RehabianexNavHost(
         }
     }
 
-    LaunchedEffect(requestedRoute) {
+    LaunchedEffect(requestedRoute, privacyAccessGranted) {
         requestedRoute?.let { route ->
             val role = sessionManager.getRole()
-            if (sessionManager.hasActiveSession() && notificationRouteAllowed(role, route)) {
-                navController.navigate(route) {
-                    launchSingleTop = true
+            if (!sessionManager.hasActiveSession()) {
+                onRouteRequestConsumed()
+            } else if (privacyAccessGranted) {
+                if (notificationRouteAllowed(role, route)) {
+                    navController.navigate(route) {
+                        launchSingleTop = true
+                    }
                 }
+                onRouteRequestConsumed()
             }
-            onRouteRequestConsumed()
         }
     }
 

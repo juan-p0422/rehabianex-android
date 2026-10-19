@@ -15,6 +15,7 @@ import com.example.rehabianex.data.repository.AdminRepository
 import com.example.rehabianex.data.repository.AuthRepository
 import com.example.rehabianex.data.repository.DataControlRepository
 import com.example.rehabianex.data.repository.PatientRepository
+import com.example.rehabianex.data.repository.PrivacyNoticeRepository
 import com.example.rehabianex.data.repository.SupervisorRepository
 import com.example.rehabianex.data.repository.FcmDemoRepository
 import com.example.rehabianex.session.SecureSessionManager
@@ -38,6 +39,11 @@ class AppContainer(context: Context) {
     private val patientIdentityStore = PatientIdentityStore(context)
     private val supervisorNotificationSettingsStore = SupervisorNotificationSettingsStore(context)
     val dataExportFileManager = DataExportFileManager(applicationContext)
+    val privacyNoticeRepository = PrivacyNoticeRepository(apiService) {
+        applicationContext.assets.open("legal/privacy-notice-2026-10-18.md")
+            .bufferedReader()
+            .use { it.readText() }
+    }
     val adminRepository = AdminRepository(
         apiService = apiService,
         sessionManager = sessionManager,

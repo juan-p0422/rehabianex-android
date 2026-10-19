@@ -201,7 +201,7 @@ class AuthRepositoryContractTest {
                 gender = "female",
                 age = 29,
                 privacyNoticeAccepted = true,
-                privacyNoticeVersion = "2026-08-01",
+                privacyNoticeVersion = "2026-10-18",
             ),
         ) as AuthResult.Failure
 
@@ -524,7 +524,7 @@ class AuthRepositoryContractTest {
     }
 
     @Test
-    fun successfulLogin_explicitlyStartsFcmRegistrationAfterSavingSession() = runTest {
+    fun successfulLogin_defersFcmRegistrationUntilPrivacyGateIsComplete() = runTest {
         val sessionManager = RecordingSessionManager()
         var registrationCalls = 0
         val repository = AuthRepository(
@@ -545,11 +545,13 @@ class AuthRepositoryContractTest {
         val result = repository.login(LoginRequest("fcm@example.com", "password"))
 
         assertTrue(result is AuthResult.Success)
+        assertEquals(0, registrationCalls)
+        repository.registerNotificationsAfterPrivacyGate()
         assertEquals(1, registrationCalls)
     }
 
     @Test
-    fun loginWithDifferentRole_revokesOldOwnerAndRegistersNewOwner() = runTest {
+    fun loginWithDifferentRole_revokesOldOwnerAndDefersNewRegistrationUntilPrivacyGate() = runTest {
         val sessionManager = activeSessionManager()
         val events = mutableListOf<String>()
         val repository = AuthRepository(
@@ -578,6 +580,11 @@ class AuthRepositoryContractTest {
         val result = repository.login(LoginRequest("switch@example.com", "password"))
 
         assertTrue(result is AuthResult.Success)
+        assertEquals(
+            listOf("revoke-patient", "clear-patient"),
+            events,
+        )
+        repository.registerNotificationsAfterPrivacyGate()
         assertEquals(
             listOf("revoke-patient", "clear-patient", "register-supervisor"),
             events,

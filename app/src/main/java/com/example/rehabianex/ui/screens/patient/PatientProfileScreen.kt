@@ -239,6 +239,10 @@ private fun ProfileContent(
         onNavigate(Routes.DataControl)
     }
     Spacer(Modifier.height(8.dp))
+    RehabianexOutlineButton("Aviso de privacidad") {
+        onNavigate(Routes.PrivacyNotice)
+    }
+    Spacer(Modifier.height(8.dp))
     if (!profile.isStale) {
         RehabianexOutlineButton("Vinculación con supervisor") {
             onNavigate(Routes.SupervisorLink)

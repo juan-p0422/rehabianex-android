@@ -24,6 +24,7 @@ import com.example.rehabianex.ui.components.DangerCard
 import com.example.rehabianex.ui.components.InputField
 import com.example.rehabianex.ui.components.PhoneNumberField
 import com.example.rehabianex.ui.components.RehabianexButton
+import com.example.rehabianex.ui.components.RehabianexOutlineButton
 import com.example.rehabianex.ui.components.ScreenScaffold
 import com.example.rehabianex.ui.components.SoftCard
 import com.example.rehabianex.ui.components.WarningCard
@@ -37,6 +38,7 @@ import com.example.rehabianex.validation.SUPERVISOR_TYPE_OTHER
 @Composable
 fun RegisterScreen(
     onRegisterClick: (RegisterFormInput) -> Unit,
+    onPrivacyNoticeClick: () -> Unit,
     uiState: AuthUiState = AuthUiState.Idle,
     onInputChanged: () -> Unit = {},
 ) {
@@ -234,6 +236,12 @@ fun RegisterScreen(
             }
         }
         Spacer(Modifier.height(10.dp))
+        RehabianexOutlineButton(
+            text = "Leer Aviso de Privacidad completo",
+            enabled = !isLoading,
+            onClick = onPrivacyNoticeClick,
+        )
+        Spacer(Modifier.height(8.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,

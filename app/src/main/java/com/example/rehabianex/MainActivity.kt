@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
                     RehabianexNavHost(
                         adminRepository = container.adminRepository,
                         authRepository = container.authRepository,
+                        privacyNoticeRepository = container.privacyNoticeRepository,
                         dataControlRepository = container.dataControlRepository,
                         dataExportFileManager = container.dataExportFileManager,
                         patientRepository = container.patientRepository,
@@ -108,11 +109,6 @@ class MainActivity : ComponentActivity() {
                 pendingRouteIntent = null
                 requestedRoute = route
                 appContainer = container
-
-                launch(Dispatchers.IO) {
-                    NotificationRescheduleWorker.enqueue(applicationContext)
-                    container.fcmTokenManager.ensureRegisteredForActiveSession()
-                }
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {

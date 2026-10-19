@@ -27,6 +27,9 @@ import com.example.rehabianex.data.model.MutationResponse
 import com.example.rehabianex.data.model.NotificationSettingsDto
 import com.example.rehabianex.data.model.PatientAchievementDto
 import com.example.rehabianex.data.model.PatientNotesResponse
+import com.example.rehabianex.data.model.PrivacyNoticeReadRequest
+import com.example.rehabianex.data.model.PrivacyNoticeReadResponse
+import com.example.rehabianex.data.model.PrivacyNoticeResponse
 import com.example.rehabianex.data.model.RefreshRequest
 import com.example.rehabianex.data.model.RegisterRequest
 import com.example.rehabianex.data.model.RespondSupervisionRequest
@@ -60,6 +63,14 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 
 interface ApiService {
+    @GET("legal/privacy-notice")
+    suspend fun privacyNotice(): Response<PrivacyNoticeResponse>
+
+    @POST("legal/privacy-notice/read")
+    suspend fun confirmPrivacyNoticeRead(
+        @Body request: PrivacyNoticeReadRequest,
+    ): Response<PrivacyNoticeReadResponse>
+
     @POST("auth/login")
     suspend fun login(
         @Body request: LoginRequest,

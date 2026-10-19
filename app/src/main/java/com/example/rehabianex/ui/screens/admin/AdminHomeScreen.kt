@@ -80,6 +80,11 @@ fun AdminHomeScreen(
                     iconRes = R.drawable.ic_nav_more,
                 ),
                 HomeMenuItem(
+                    label = "Aviso de privacidad",
+                    route = Routes.PrivacyNotice,
+                    iconRes = R.drawable.ic_nav_more,
+                ),
+                HomeMenuItem(
                     label = "Cerrar sesión",
                     route = ADMIN_LOGOUT_ACTION,
                     iconRes = R.drawable.ic_nav_more,

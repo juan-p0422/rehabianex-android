@@ -7,6 +7,8 @@ object Routes {
     const val Login = "login"
     const val Register = "register"
     const val Consent = "consent"
+    const val PrivacyGate = "privacy_gate"
+    const val PrivacyNotice = "privacy_notice"
     const val RoleSelection = "role_selection"
 
     const val PatientHome = "patient_home"

@@ -68,6 +68,10 @@ class AuthRepository(
         apiService.register(request)
     }
 
+    suspend fun registerNotificationsAfterPrivacyGate() {
+        runNonCriticalFcmOperation(registerFcmToken)
+    }
+
     /**
      * El cierre local es obligatorio incluso cuando el backend no responde. Los
      * tokens se eliminan al final y no dependen del resultado de la limpieza de caché.
@@ -221,7 +225,6 @@ class AuthRepository(
                     displayName = session.displayName,
                 ),
             )
-            runNonCriticalFcmOperation(registerFcmToken)
             AuthResult.Success(
                 session = session,
                 message = "Autenticación completada.",
