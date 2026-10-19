@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -90,6 +91,8 @@ fun RehabianexNavHost(
     var logoutInProgress by rememberSaveable { mutableStateOf(false) }
     var privacyAccessGranted by rememberSaveable { mutableStateOf(false) }
     var postRegistrationRole by rememberSaveable { mutableStateOf<String?>(null) }
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentBackStackEntry?.destination?.route
 
     fun beginLogout(confirmPendingNotesDeletion: Boolean) {
         if (logoutInProgress) return
@@ -218,6 +221,7 @@ fun RehabianexNavHost(
             val privacyState by privacyViewModel.uiState.collectAsStateWithLifecycle()
             LaunchedEffect(privacyState) {
                 if (privacyState is PrivacyNoticeUiState.AccessGranted) {
+                    privacyAccessGranted = true
                     NotificationRescheduleWorker.enqueue(context)
                     coroutineScope.launch {
                         authRepository.registerNotificationsAfterPrivacyGate()
@@ -236,7 +240,6 @@ fun RehabianexNavHost(
                     navController.navigate(destination) {
                         popUpTo(Routes.PrivacyGate) { inclusive = true }
                     }
-                    privacyAccessGranted = true
                 }
             }
             PrivacyNoticeScreen(
@@ -413,6 +416,20 @@ fun RehabianexNavHost(
         }
     }
 
+    LaunchedEffect(currentRoute, privacyAccessGranted) {
+        if (shouldRedirectToPrivacyGate(
+                hasActiveSession = sessionManager.hasActiveSession(),
+                privacyAccessGranted = privacyAccessGranted,
+                currentRoute = currentRoute,
+            )
+        ) {
+            navController.navigate(Routes.PrivacyGate) {
+                popUpTo(requireNotNull(currentRoute)) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
+
     pendingLogoutNotesCount?.let { count ->
         AlertDialog(
             onDismissRequest = {
@@ -495,6 +512,23 @@ internal fun notificationRouteAllowed(role: String?, route: String): Boolean = w
 private val SAFE_PATIENT_DETAIL_ROUTE = Regex(
     "^${Routes.PatientDetail}/[A-Za-z0-9_-]{1,128}$",
 )
+
+private val PRIVACY_GATE_PUBLIC_ROUTES = setOf(
+    Routes.Splash,
+    Routes.Login,
+    Routes.Register,
+    Routes.PrivacyGate,
+    Routes.PrivacyNotice,
+)
+
+internal fun shouldRedirectToPrivacyGate(
+    hasActiveSession: Boolean,
+    privacyAccessGranted: Boolean,
+    currentRoute: String?,
+): Boolean = hasActiveSession &&
+    !privacyAccessGranted &&
+    currentRoute != null &&
+    currentRoute !in PRIVACY_GATE_PUBLIC_ROUTES
 
 internal fun homeRouteForRole(role: String?): String? = when (role) {
     "patient" -> Routes.PatientHome

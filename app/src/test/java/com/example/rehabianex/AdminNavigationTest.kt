@@ -4,12 +4,25 @@ import com.example.rehabianex.navigation.Routes
 import com.example.rehabianex.navigation.homeRouteForRole
 import com.example.rehabianex.navigation.activeSessionHomeRoute
 import com.example.rehabianex.navigation.postRegistrationRoute
+import com.example.rehabianex.navigation.shouldRedirectToPrivacyGate
 import com.example.rehabianex.navigation.patientSupervisionSetupRoute
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AdminNavigationTest {
+    @Test
+    fun protectedRoutesRedirectToPrivacyGateUntilServerGrantsAccess() {
+        assertTrue(shouldRedirectToPrivacyGate(true, false, Routes.PatientHome))
+        assertTrue(shouldRedirectToPrivacyGate(true, false, Routes.AdminHome))
+        assertFalse(shouldRedirectToPrivacyGate(true, false, Routes.PrivacyGate))
+        assertFalse(shouldRedirectToPrivacyGate(true, false, Routes.PrivacyNotice))
+        assertFalse(shouldRedirectToPrivacyGate(true, true, Routes.PatientHome))
+        assertFalse(shouldRedirectToPrivacyGate(false, false, Routes.Register))
+    }
+
     @Test
     fun adminRole_hasDedicatedHomeRoute() {
         assertEquals(Routes.AdminHome, homeRouteForRole("admin"))
