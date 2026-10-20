@@ -20,6 +20,25 @@ import retrofit2.Response
 
 class PrivacyNoticeRepositoryTest {
     @Test
+    fun legacyProfileWithoutConfirmationRequiresTheNotice() = runTest {
+        val repository = PrivacyNoticeRepository(
+            apiService = apiService { method ->
+                when (method) {
+                    "privacyNotice" -> Response.success(noticeResponse())
+                    "me" -> Response.success(MeResponse(profile = SessionProfileDto()))
+                    else -> error("Unexpected call: $method")
+                }
+            },
+            fallbackContent = { "fallback" },
+        )
+
+        val result = repository.load(requireServerStatus = true)
+
+        assertTrue(result.serverStatusChecked)
+        assertFalse(result.currentReadConfirmedByServer)
+    }
+
+    @Test
     fun currentConfirmationRequiresServerProfileAndMatchingVersion() = runTest {
         val repository = PrivacyNoticeRepository(
             apiService = apiService { method ->
