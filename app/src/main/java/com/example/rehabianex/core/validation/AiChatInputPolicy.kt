@@ -2,6 +2,9 @@ package com.example.rehabianex.core.validation
 
 const val MAX_AI_CHAT_QUESTION_LENGTH = 800
 
+fun preserveAiChatDraft(value: String): String =
+    value.take(MAX_AI_CHAT_QUESTION_LENGTH + 1)
+
 fun String.sanitizeAiChatQuestion(): String {
     return filterNot { it.isISOControl() }
         .replace(HTML_TAG_REGEX, " ")

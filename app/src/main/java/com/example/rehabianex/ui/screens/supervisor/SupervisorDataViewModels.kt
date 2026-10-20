@@ -16,6 +16,7 @@ import com.example.rehabianex.data.model.SupervisorProfileData
 import com.example.rehabianex.data.repository.SupervisorDataResult
 import com.example.rehabianex.data.repository.SupervisorRepository
 import com.example.rehabianex.core.validation.MAX_AI_CHAT_QUESTION_LENGTH
+import com.example.rehabianex.core.validation.preserveAiChatDraft
 import com.example.rehabianex.core.validation.sanitizeAiChatQuestion
 import com.example.rehabianex.validation.EditableProfileFormInput
 import com.example.rehabianex.validation.ProfileFormValidator
@@ -613,9 +614,7 @@ class AiChatViewModel(
 
     fun updateQuestion(value: String) {
         _uiState.value = _uiState.value.copy(
-            question = value
-                .sanitizeAiChatQuestion()
-                .take(MAX_AI_CHAT_QUESTION_LENGTH + 1),
+            question = preserveAiChatDraft(value),
             errorMessage = null,
         )
     }

@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.example.rehabianex.core.session.SessionManager
 import com.example.rehabianex.core.session.UserSession
 import com.example.rehabianex.core.validation.MAX_AI_CHAT_QUESTION_LENGTH
+import com.example.rehabianex.core.validation.preserveAiChatDraft
 import com.example.rehabianex.core.validation.sanitizeAiChatQuestion
 import com.example.rehabianex.core.network.ApiClient
 import com.example.rehabianex.data.model.AuthResponse
@@ -36,6 +37,28 @@ import org.junit.Test
 import retrofit2.Response
 
 class SupervisorAiChatContractTest {
+    @Test
+    fun draftPolicyPreservesSpacesAccentsPunctuationAndMiddleEdits() {
+        val phrase = "Resume mis registros de esta semana"
+        val draftWithComposingSpace = preserveAiChatDraft("Resume ")
+        val editedInTheMiddle = preserveAiChatDraft("Resume mis registros, ¿sí? de esta semana")
+        val pasted = preserveAiChatDraft("Ánimo, sueño y craving: mañana; niño/niña.")
+
+        assertEquals("Resume ", draftWithComposingSpace)
+        assertEquals(phrase, preserveAiChatDraft(phrase))
+        assertEquals("Resume mis registros, ¿sí? de esta semana", editedInTheMiddle)
+        assertEquals("Ánimo, sueño y craving: mañana; niño/niña.", pasted)
+    }
+
+    @Test
+    fun draftPolicyKeepsExistingLengthLimitWithoutNormalizingDuringEntry() {
+        val overLimit = "x".repeat(MAX_AI_CHAT_QUESTION_LENGTH + 2)
+
+        assertEquals(MAX_AI_CHAT_QUESTION_LENGTH + 1, preserveAiChatDraft(overLimit).length)
+        assertEquals("   ", preserveAiChatDraft("   "))
+        assertEquals("", "   ".sanitizeAiChatQuestion())
+    }
+
     @Test
     fun questionPolicySanitizesAndPreservesOverLimitDetection() {
         val sanitized = "  <b>Pregunta\u0000   sensible</b>  ".sanitizeAiChatQuestion()
@@ -192,6 +215,23 @@ class SupervisorAiChatContractTest {
         assertEquals("Revisar ansiedad", sentRequest?.question)
         assertFalse(sentRequest?.question.orEmpty().contains(PATIENT_ALLOWED))
         assertFalse(sentRequest?.question.orEmpty().contains(PATIENT_DENIED))
+    }
+
+    @Test
+    fun normalPhraseReachesNetworkDtoWithInternalSpacesUnchanged() = runTest {
+        var sentRequest: SupervisorChatRequest? = null
+        val repository = repository(
+            activeChatHandler { request ->
+                sentRequest = request
+                Response.success(SupervisorChatResponse(answer = "Respuesta local sintética."))
+            },
+        )
+        val phrase = "Resume mis registros de esta semana"
+
+        val result = repository.askSupervisorChat(phrase, mode = "local")
+
+        assertTrue(result is SupervisorDataResult.Success)
+        assertEquals(phrase, sentRequest?.question)
     }
 
     @Test
