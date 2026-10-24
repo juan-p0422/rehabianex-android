@@ -29,6 +29,69 @@ import retrofit2.http.POST
 
 class AuthRepositoryContractTest {
     @Test
+    fun register201WithSessionAndProfileWithoutPrivacyReadRequiresGateConfirmation() = runTest {
+        val sessionManager = RecordingSessionManager()
+        val repository = AuthRepository(
+            apiService = apiService { method ->
+                when (method) {
+                    "register" -> Response.success(
+                        201,
+                        AuthResponse(
+                            auth = AuthData(uid = "new-patient-session", role = "patient"),
+                            profile = SessionProfileDto(
+                                uid = "new-patient-session",
+                                role = "patient",
+                            ),
+                            tokens = validTokens(),
+                        ),
+                    )
+                    else -> error("Unexpected ApiService call: $method")
+                }
+            },
+            sessionManager = sessionManager,
+        )
+
+        val result = repository.register(syntheticRegisterRequest())
+
+        assertTrue(result is AuthResult.Success)
+        val session = (result as AuthResult.Success).session
+        assertTrue(session.privacyNoticeStatusChecked)
+        assertNull(session.privacyNoticeConfirmedVersion)
+        assertNotNull(sessionManager.savedSession)
+    }
+
+    @Test
+    fun register201WithoutTokensCreatesAccountWithoutOpeningSession() = runTest {
+        val sessionManager = RecordingSessionManager()
+        val repository = AuthRepository(
+            apiService = apiService { method ->
+                when (method) {
+                    "register" -> Response.success(
+                        201,
+                        AuthResponse(
+                            auth = AuthData(uid = "new-patient-tokenless", role = "patient"),
+                            profile = SessionProfileDto(
+                                uid = "new-patient-tokenless",
+                                role = "patient",
+                            ),
+                        ),
+                    )
+                    else -> error("Unexpected ApiService call: $method")
+                }
+            },
+            sessionManager = sessionManager,
+        )
+
+        val result = repository.register(syntheticRegisterRequest())
+
+        assertTrue(result is AuthResult.AccountCreated)
+        val created = result as AuthResult.AccountCreated
+        assertEquals("new-patient-tokenless", created.uid)
+        assertEquals("patient", created.role)
+        assertNull(sessionManager.savedSession)
+    }
+
+    @Test
     fun loginCarriesAuthenticatedPrivacyStatusIntoTheGateDecision() = runTest {
         val repository = AuthRepository(
             apiService = apiServiceReturning(
@@ -624,6 +687,16 @@ class AuthRepositoryContractTest {
     private fun validTokens() = TokenData(
         idToken = "header.payload.signature",
         refreshToken = "refresh-token",
+    )
+
+    private fun syntheticRegisterRequest() = RegisterRequest(
+        email = "new-patient@example.test",
+        password = "SyntheticPassword123!",
+        fullName = "Paciente Sintético",
+        role = "patient",
+        phone = "+524490000000",
+        privacyNoticeAccepted = true,
+        privacyNoticeVersion = "2026-10-18",
     )
 
     private fun apiServiceReturning(responseBody: AuthResponse): ApiService {
