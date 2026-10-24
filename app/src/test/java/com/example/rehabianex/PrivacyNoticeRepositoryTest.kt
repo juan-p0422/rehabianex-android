@@ -13,7 +13,13 @@ import com.example.rehabianex.data.remote.ApiService
 import com.example.rehabianex.data.repository.PrivacyNoticeConfirmResult
 import com.example.rehabianex.data.repository.PrivacyNoticeRepository
 import java.lang.reflect.Proxy
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
+import kotlin.coroutines.resume
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
@@ -24,6 +30,132 @@ import org.junit.Test
 import retrofit2.Response
 
 class PrivacyNoticeRepositoryTest {
+    @Test
+    fun authenticatedCurrentConfirmationSkipsRepeatedGateRequests() = runTest {
+        val calls = mutableListOf<String>()
+        val store = FakePrivacyNoticeReadStore()
+        val result = repository(
+            apiService = apiService { method ->
+                calls += method
+                error("Unexpected call: $method")
+            },
+            store = store,
+        ).load(
+            requireServerStatus = true,
+            authenticatedStatusChecked = true,
+            authenticatedConfirmedVersion = CURRENT_VERSION,
+        )
+
+        assertTrue(result.accessGranted)
+        assertTrue(calls.isEmpty())
+        assertEquals(CURRENT_VERSION, store.confirmedVersion(OWNER_A))
+    }
+
+    @Test
+    fun authenticatedPendingStatusLoadsOnlyNoticeContent() = runTest {
+        val calls = mutableListOf<String>()
+        val result = repository(
+            apiService = apiService { method ->
+                calls += method
+                when (method) {
+                    "privacyNotice" -> Response.success(noticeResponse())
+                    else -> error("Unexpected call: $method")
+                }
+            },
+            store = FakePrivacyNoticeReadStore(),
+        ).load(
+            requireServerStatus = true,
+            authenticatedStatusChecked = true,
+        )
+
+        assertFalse(result.accessGranted)
+        assertEquals(listOf("privacyNotice"), calls)
+    }
+
+    @Test
+    fun authenticatedConfirmationWithoutCurrentOwnerDoesNotGrantAccess() = runTest {
+        val calls = mutableListOf<String>()
+        val result = PrivacyNoticeRepository(
+            apiService = apiService { method ->
+                calls += method
+                when (method) {
+                    "privacyNotice" -> Response.success(noticeResponse())
+                    else -> error("Unexpected call: $method")
+                }
+            },
+            sessionManager = FakeSessionManager(null),
+            readStore = FakePrivacyNoticeReadStore(),
+            fallbackContent = { "Aviso local completo" },
+        ).load(
+            requireServerStatus = true,
+            authenticatedStatusChecked = true,
+            authenticatedConfirmedVersion = CURRENT_VERSION,
+        )
+
+        assertFalse(result.accessGranted)
+        assertEquals(listOf("privacyNotice"), calls)
+    }
+
+    @Test
+    fun reopenedConfirmedAccountChecksProfileWithoutDownloadingNoticeAgain() = runTest {
+        val calls = mutableListOf<String>()
+        val store = FakePrivacyNoticeReadStore().apply {
+            saveConfirmedVersion(OWNER_A, CURRENT_VERSION)
+        }
+        val result = repository(
+            apiService = apiService { method ->
+                calls += method
+                when (method) {
+                    "me" -> Response.success(confirmedMeResponse())
+                    else -> error("Unexpected call: $method")
+                }
+            },
+            store = store,
+        ).load(requireServerStatus = true)
+
+        assertTrue(result.accessGranted)
+        assertEquals(listOf("me"), calls)
+    }
+
+    @Test
+    fun gateLoadsNoticeAndProfileConcurrentlyWithOneRequestEach() = runTest {
+        val privacyStarted = CompletableDeferred<Unit>()
+        val profileStarted = CompletableDeferred<Unit>()
+        var privacyCalls = 0
+        var profileCalls = 0
+        val apiService = suspendingApiService { method, continuation ->
+            when (method) {
+                "privacyNotice" -> {
+                    privacyCalls += 1
+                    privacyStarted.complete(Unit)
+                    backgroundScope.launch {
+                        profileStarted.await()
+                        continuation.resume(Response.success(noticeResponse()))
+                    }
+                    COROUTINE_SUSPENDED
+                }
+                "me" -> {
+                    profileCalls += 1
+                    profileStarted.complete(Unit)
+                    backgroundScope.launch {
+                        privacyStarted.await()
+                        continuation.resume(Response.success(confirmedMeResponse()))
+                    }
+                    COROUTINE_SUSPENDED
+                }
+                else -> error("Unexpected call: $method")
+            }
+        }
+
+        val result = withTimeout(1_000) {
+            repository(apiService, FakePrivacyNoticeReadStore()).load(requireServerStatus = true)
+        }
+
+        assertTrue(result.accessGranted)
+        assertEquals(1, privacyCalls)
+        assertEquals(1, profileCalls)
+    }
+
     @Test
     fun legacyProfileWithoutConfirmationRequiresTheNoticeAndClearsStaleEvidence() = runTest {
         val store = FakePrivacyNoticeReadStore().apply {
@@ -377,6 +509,18 @@ class PrivacyNoticeRepositoryTest {
         ApiService::class.java.classLoader,
         arrayOf(ApiService::class.java),
     ) { _, method, _ -> handler(method.name) } as ApiService
+
+    private fun suspendingApiService(
+        handler: (String, Continuation<Any?>) -> Any?,
+    ): ApiService = Proxy.newProxyInstance(
+        ApiService::class.java.classLoader,
+        arrayOf(ApiService::class.java),
+    ) { _, method, arguments ->
+        @Suppress("UNCHECKED_CAST")
+        val continuation = arguments?.lastOrNull() as? Continuation<Any?>
+            ?: error("Missing continuation for ${method.name}")
+        handler(method.name, continuation)
+    } as ApiService
 
     private class FakePrivacyNoticeReadStore : PrivacyNoticeReadStore {
         private val versions = mutableMapOf<String, String>()

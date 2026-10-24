@@ -91,6 +91,8 @@ fun RehabianexNavHost(
     var logoutInProgress by rememberSaveable { mutableStateOf(false) }
     var privacyAccessGranted by rememberSaveable { mutableStateOf(false) }
     var postRegistrationRole by rememberSaveable { mutableStateOf<String?>(null) }
+    var authenticatedPrivacyStatusChecked by rememberSaveable { mutableStateOf(false) }
+    var authenticatedPrivacyConfirmedVersion by rememberSaveable { mutableStateOf<String?>(null) }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
 
@@ -105,6 +107,8 @@ fun RehabianexNavHost(
                 } else {
                     authInfoMessage = result.message
                     privacyAccessGranted = false
+                    authenticatedPrivacyStatusChecked = false
+                    authenticatedPrivacyConfirmedVersion = null
                     navController.returnToLogin()
                 }
             } finally {
@@ -144,6 +148,8 @@ fun RehabianexNavHost(
                     authViewModel.clearState()
                     postRegistrationRole = null
                     privacyAccessGranted = false
+                    authenticatedPrivacyStatusChecked = it.session.privacyNoticeStatusChecked
+                    authenticatedPrivacyConfirmedVersion = it.session.privacyNoticeConfirmedVersion
                     navController.navigate(Routes.PrivacyGate) {
                         popUpTo(Routes.Login) {
                             inclusive = true
@@ -182,6 +188,9 @@ fun RehabianexNavHost(
                     authViewModel.clearState()
                     postRegistrationRole = it.session.role
                     privacyAccessGranted = false
+                    // A newly created session must still show the notice before initial setup.
+                    authenticatedPrivacyStatusChecked = true
+                    authenticatedPrivacyConfirmedVersion = null
                     navController.navigate(Routes.PrivacyGate) {
                         popUpTo(Routes.Register) {
                             inclusive = true
@@ -216,6 +225,8 @@ fun RehabianexNavHost(
                 factory = PrivacyNoticeViewModel.Factory(
                     repository = privacyNoticeRepository,
                     confirmationRequired = true,
+                    authenticatedStatusChecked = authenticatedPrivacyStatusChecked,
+                    authenticatedConfirmedVersion = authenticatedPrivacyConfirmedVersion,
                 ),
             )
             val privacyState by privacyViewModel.uiState.collectAsStateWithLifecycle()
@@ -237,6 +248,8 @@ fun RehabianexNavHost(
                     }
                     if (requestedRoute != null) onRouteRequestConsumed()
                     postRegistrationRole = null
+                    authenticatedPrivacyStatusChecked = false
+                    authenticatedPrivacyConfirmedVersion = null
                     navController.navigate(destination) {
                         popUpTo(Routes.PrivacyGate) { inclusive = true }
                     }

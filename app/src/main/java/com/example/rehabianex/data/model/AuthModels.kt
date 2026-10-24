@@ -99,4 +99,6 @@ data class AuthSession(
     val role: String,
     val email: String? = null,
     val displayName: String? = null,
+    val privacyNoticeStatusChecked: Boolean = false,
+    val privacyNoticeConfirmedVersion: String? = null,
 )

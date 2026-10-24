@@ -6,6 +6,7 @@ import com.example.rehabianex.core.session.UserSession
 import com.example.rehabianex.data.model.AuthResponse
 import com.example.rehabianex.data.model.AuthSession
 import com.example.rehabianex.data.model.LoginRequest
+import com.example.rehabianex.data.model.PRIVACY_NOTICE_VERSION
 import com.example.rehabianex.data.model.RegisterRequest
 import com.example.rehabianex.data.model.SessionProfileDto
 import com.example.rehabianex.data.model.isPatientPrivacyRestricted
@@ -159,6 +160,13 @@ class AuthRepository(
         val email = auth?.email?.toSafeProfileText()
         val displayName = resolveAuthSessionDisplayName(role, auth, profile)
             ?.toSafeProfileText()
+        val privacyNoticeConfirmedVersion = profile?.privacyNoticeRead
+            ?.takeIf {
+                it.status == "confirmed" &&
+                    it.isCurrent == true &&
+                    it.privacyNoticeVersion == PRIVACY_NOTICE_VERSION
+            }
+            ?.privacyNoticeVersion
 
         if (
             allowTokenlessAccount &&
@@ -191,6 +199,8 @@ class AuthRepository(
             role = role,
             email = email,
             displayName = displayName,
+            privacyNoticeStatusChecked = profile != null,
+            privacyNoticeConfirmedVersion = privacyNoticeConfirmedVersion,
         )
 
         return try {

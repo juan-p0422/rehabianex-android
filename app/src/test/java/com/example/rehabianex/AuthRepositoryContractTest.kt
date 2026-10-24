@@ -5,6 +5,7 @@ import com.example.rehabianex.core.session.UserSession
 import com.example.rehabianex.data.model.AuthData
 import com.example.rehabianex.data.model.AuthResponse
 import com.example.rehabianex.data.model.LoginRequest
+import com.example.rehabianex.data.model.PrivacyNoticeReadDto
 import com.example.rehabianex.data.model.RegisterRequest
 import com.example.rehabianex.data.model.SessionProfileDto
 import com.example.rehabianex.data.model.TokenData
@@ -27,6 +28,35 @@ import retrofit2.Response
 import retrofit2.http.POST
 
 class AuthRepositoryContractTest {
+    @Test
+    fun loginCarriesAuthenticatedPrivacyStatusIntoTheGateDecision() = runTest {
+        val repository = AuthRepository(
+            apiService = apiServiceReturning(
+                AuthResponse(
+                    auth = AuthData(uid = "confirmed-user", role = "patient"),
+                    profile = SessionProfileDto(
+                        uid = "confirmed-user",
+                        role = "patient",
+                        privacyNoticeRead = PrivacyNoticeReadDto(
+                            privacyNoticeVersion = "2026-10-18",
+                            status = "confirmed",
+                            isCurrent = true,
+                        ),
+                    ),
+                    tokens = validTokens(),
+                ),
+            ),
+            sessionManager = RecordingSessionManager(),
+        )
+
+        val result = repository.login(LoginRequest("synthetic@example.com", "synthetic-password"))
+
+        assertTrue(result is AuthResult.Success)
+        val session = (result as AuthResult.Success).session
+        assertTrue(session.privacyNoticeStatusChecked)
+        assertEquals("2026-10-18", session.privacyNoticeConfirmedVersion)
+    }
+
     @Test
     fun logoutApiContract_usesPostAuthLogout() {
         val method = ApiService::class.java.methods.single { it.name == "logout" }

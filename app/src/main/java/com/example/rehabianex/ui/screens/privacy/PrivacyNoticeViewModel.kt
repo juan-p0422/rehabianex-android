@@ -26,6 +26,8 @@ sealed interface PrivacyNoticeUiState {
 class PrivacyNoticeViewModel(
     private val repository: PrivacyNoticeRepository,
     private val confirmationRequired: Boolean,
+    private val authenticatedStatusChecked: Boolean = false,
+    private val authenticatedConfirmedVersion: String? = null,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<PrivacyNoticeUiState>(PrivacyNoticeUiState.Loading)
     val uiState: StateFlow<PrivacyNoticeUiState> = _uiState.asStateFlow()
@@ -42,7 +44,13 @@ class PrivacyNoticeViewModel(
     private fun loadInternal() {
         viewModelScope.launch {
             _uiState.value = PrivacyNoticeUiState.Loading
-            val result = runCatching { repository.load(confirmationRequired) }
+            val result = runCatching {
+                repository.load(
+                    requireServerStatus = confirmationRequired,
+                    authenticatedStatusChecked = authenticatedStatusChecked,
+                    authenticatedConfirmedVersion = authenticatedConfirmedVersion,
+                )
+            }
                 .getOrElse {
                     _uiState.value = PrivacyNoticeUiState.Error(
                         "No fue posible abrir el aviso. Intenta nuevamente.",
@@ -80,11 +88,18 @@ class PrivacyNoticeViewModel(
     class Factory(
         private val repository: PrivacyNoticeRepository,
         private val confirmationRequired: Boolean,
+        private val authenticatedStatusChecked: Boolean = false,
+        private val authenticatedConfirmedVersion: String? = null,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(PrivacyNoticeViewModel::class.java))
-            return PrivacyNoticeViewModel(repository, confirmationRequired) as T
+            return PrivacyNoticeViewModel(
+                repository = repository,
+                confirmationRequired = confirmationRequired,
+                authenticatedStatusChecked = authenticatedStatusChecked,
+                authenticatedConfirmedVersion = authenticatedConfirmedVersion,
+            ) as T
         }
     }
 }

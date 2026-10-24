@@ -2,12 +2,16 @@ package com.example.rehabianex.data.repository
 
 import com.example.rehabianex.core.session.SessionManager
 import com.example.rehabianex.data.local.PrivacyNoticeReadStore
+import com.example.rehabianex.data.model.MeResponse
 import com.example.rehabianex.data.model.PRIVACY_NOTICE_VERSION
 import com.example.rehabianex.data.model.PrivacyNoticeDto
 import com.example.rehabianex.data.model.PrivacyNoticeReadRequest
 import com.example.rehabianex.data.remote.ApiErrorParser
 import com.example.rehabianex.data.remote.ApiService
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import retrofit2.Response
 
 data class PrivacyNoticeLoadResult(
     val notice: PrivacyNoticeDto,
@@ -31,17 +35,51 @@ class PrivacyNoticeRepository(
     private val readStore: PrivacyNoticeReadStore,
     private val fallbackContent: () -> String,
 ) {
-    suspend fun load(requireServerStatus: Boolean): PrivacyNoticeLoadResult {
-        val remoteNotice = try {
-            apiService.privacyNotice().takeIf { it.isSuccessful }?.body()?.notice
-                ?.takeIf { !it.version.isNullOrBlank() && !it.content.isNullOrBlank() }
-        } catch (error: CancellationException) {
-            throw error
-        } catch (_: Exception) {
+    suspend fun load(
+        requireServerStatus: Boolean,
+        authenticatedStatusChecked: Boolean = false,
+        authenticatedConfirmedVersion: String? = null,
+    ): PrivacyNoticeLoadResult = coroutineScope {
+        val uid = sessionManager.getUid()?.takeIf(String::isNotBlank)
+        if (requireServerStatus &&
+            authenticatedStatusChecked &&
+            authenticatedConfirmedVersion == PRIVACY_NOTICE_VERSION &&
+            uid != null
+        ) {
+            readStore.saveConfirmedVersion(uid, PRIVACY_NOTICE_VERSION)
+            return@coroutineScope confirmedResult(fallbackNotice())
+        }
+
+        val preloadedProfile = requireServerStatus &&
+            !authenticatedStatusChecked &&
+            uid != null &&
+            readStore.confirmedVersion(uid) == PRIVACY_NOTICE_VERSION
+        val preloadedProfileResponse = if (preloadedProfile) loadProfileResponse() else null
+        if (preloadedProfileResponse?.isSuccessful == true &&
+            sessionManager.getUid()?.takeIf(String::isNotBlank) == uid
+        ) {
+            val read = preloadedProfileResponse.body()?.profile?.privacyNoticeRead
+            if (read?.status == "confirmed" &&
+                read.isCurrent == true &&
+                read.privacyNoticeVersion == PRIVACY_NOTICE_VERSION
+            ) {
+                readStore.saveConfirmedVersion(requireNotNull(uid), PRIVACY_NOTICE_VERSION)
+                return@coroutineScope confirmedResult(fallbackNotice())
+            }
+        }
+
+        val remoteNoticeRequest = async { loadRemoteNotice() }
+        val profileRequest = if (
+            requireServerStatus &&
+            !authenticatedStatusChecked &&
+            !preloadedProfile
+        ) {
+            async { loadProfileResponse() }
+        } else {
             null
         }
+        val remoteNotice = remoteNoticeRequest.await()
         val notice = remoteNotice ?: fallbackNotice()
-        val uid = sessionManager.getUid()?.takeIf(String::isNotBlank)
         if (uid != null && remoteNotice != null) {
             readStore.confirmedVersion(uid)
                 ?.takeIf { it != notice.version }
@@ -49,7 +87,7 @@ class PrivacyNoticeRepository(
         }
 
         if (!requireServerStatus) {
-            return PrivacyNoticeLoadResult(
+            return@coroutineScope PrivacyNoticeLoadResult(
                 notice = notice,
                 currentReadConfirmedByServer = false,
                 serverStatusChecked = remoteNotice != null,
@@ -57,10 +95,33 @@ class PrivacyNoticeRepository(
             )
         }
 
-        return try {
-            val response = apiService.me()
+        if (authenticatedStatusChecked) {
+            val confirmed = uid != null &&
+                authenticatedConfirmedVersion != null &&
+                authenticatedConfirmedVersion == notice.version
+            if (uid != null) {
+                if (confirmed) {
+                    readStore.saveConfirmedVersion(uid, requireNotNull(notice.version))
+                } else {
+                    readStore.clearOwner(uid)
+                }
+            }
+            return@coroutineScope PrivacyNoticeLoadResult(
+                notice = notice,
+                currentReadConfirmedByServer = confirmed,
+                serverStatusChecked = true,
+                warning = if (remoteNotice == null) OFFLINE_NOTICE_WARNING else null,
+            )
+        }
+
+        val response = if (preloadedProfile) {
+            preloadedProfileResponse
+        } else {
+            profileRequest?.await()
+        } ?: return@coroutineScope transientFailureResult(notice, uid)
+        return@coroutineScope try {
             if (sessionManager.getUid()?.takeIf(String::isNotBlank) != uid) {
-                return PrivacyNoticeLoadResult(notice, false, true, STATUS_ERROR)
+                return@coroutineScope PrivacyNoticeLoadResult(notice, false, true, STATUS_ERROR)
             }
             if (response.isSuccessful) {
                 val read = response.body()?.profile?.privacyNoticeRead
@@ -92,6 +153,29 @@ class PrivacyNoticeRepository(
             transientFailureResult(notice, uid)
         }
     }
+
+    private suspend fun loadRemoteNotice(): PrivacyNoticeDto? = try {
+        apiService.privacyNotice().takeIf { it.isSuccessful }?.body()?.notice
+            ?.takeIf { !it.version.isNullOrBlank() && !it.content.isNullOrBlank() }
+    } catch (error: CancellationException) {
+        throw error
+    } catch (_: Exception) {
+        null
+    }
+
+    private suspend fun loadProfileResponse(): Response<MeResponse>? = try {
+        apiService.me()
+    } catch (error: CancellationException) {
+        throw error
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun confirmedResult(notice: PrivacyNoticeDto) = PrivacyNoticeLoadResult(
+        notice = notice,
+        currentReadConfirmedByServer = true,
+        serverStatusChecked = true,
+    )
 
     suspend fun confirmRead(version: String): PrivacyNoticeConfirmResult {
         return try {
