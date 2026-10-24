@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.rehabianex.core.session.OfflineDataCleanupCoordinator
 import com.example.rehabianex.data.local.PatientIdentityStore
+import com.example.rehabianex.data.local.SharedPreferencesPrivacyNoticeReadStore
 import com.example.rehabianex.data.local.SupervisorNotificationSettingsStore
 import com.example.rehabianex.data.local.db.PatientSummaryEntity
 import com.example.rehabianex.data.local.db.PatientProfileEntity
@@ -101,11 +102,13 @@ class EncryptedRoomDatabaseInstrumentedTest {
         )
         val identityStore = PatientIdentityStore(context)
         val supervisorStore = SupervisorNotificationSettingsStore(context)
+        val privacyNoticeReadStore = SharedPreferencesPrivacyNoticeReadStore(context)
         val coordinator = OfflineDataCleanupCoordinator(
             context = context,
             database = database!!,
             patientIdentityStore = identityStore,
             supervisorNotificationSettingsStore = supervisorStore,
+            privacyNoticeReadStore = privacyNoticeReadStore,
         )
         val pendingRequest = CreatePatientNoteRequest(
             mood = "neutral",
@@ -121,20 +124,24 @@ class EncryptedRoomDatabaseInstrumentedTest {
         database!!.patientProfileDao().upsert(profile("owner-a", "Propietario A"))
         database!!.patientNoteDao().upsert(pendingRequest.toPendingEntity("owner-a"))
         identityStore.ensureOriginalName("owner-a", "Propietario A")
+        privacyNoticeReadStore.saveConfirmedVersion("owner-a", "2026-10-18")
         coordinator.clearAfterConfirmedLogout("owner-a", "patient")
 
         assertNull(database!!.patientSummaryDao().get("owner-a"))
         assertNull(database!!.patientProfileDao().get("owner-a"))
         assertEquals(0, database!!.patientNoteDao().pendingCount("owner-a"))
         assertNull(identityStore.load("owner-a").originalName)
+        assertNull(privacyNoticeReadStore.confirmedVersion("owner-a"))
 
         database!!.patientSummaryDao().upsert(
             PatientSummaryEntity("owner-b", "Propietario B", null, 2L),
         )
         database!!.patientProfileDao().upsert(profile("owner-b", "Propietario B"))
+        privacyNoticeReadStore.saveConfirmedVersion("owner-b", "2026-10-18")
         coordinator.clearForUserSwitch("owner-b", "patient")
         assertNull(database!!.patientSummaryDao().get("owner-b"))
         assertNull(database!!.patientProfileDao().get("owner-b"))
+        assertNull(privacyNoticeReadStore.confirmedVersion("owner-b"))
     }
 
     private fun profile(ownerUid: String, displayName: String) = PatientProfileEntity(

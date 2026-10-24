@@ -9,6 +9,7 @@ import com.example.rehabianex.data.local.PatientIdentityStore
 import com.example.rehabianex.data.export.DataExportFileManager
 import com.example.rehabianex.data.local.AndroidNetworkStatusProvider
 import com.example.rehabianex.data.local.SupervisorNotificationSettingsStore
+import com.example.rehabianex.data.local.SharedPreferencesPrivacyNoticeReadStore
 import com.example.rehabianex.data.local.db.RehabiAnexDatabase
 import com.example.rehabianex.data.remote.ApiService
 import com.example.rehabianex.data.repository.AdminRepository
@@ -38,8 +39,13 @@ class AppContainer(context: Context) {
     val adaptiveSupportManager = AdaptiveSupportManager(applicationContext, database, sessionManager)
     private val patientIdentityStore = PatientIdentityStore(context)
     private val supervisorNotificationSettingsStore = SupervisorNotificationSettingsStore(context)
+    private val privacyNoticeReadStore = SharedPreferencesPrivacyNoticeReadStore(context)
     val dataExportFileManager = DataExportFileManager(applicationContext)
-    val privacyNoticeRepository = PrivacyNoticeRepository(apiService) {
+    val privacyNoticeRepository = PrivacyNoticeRepository(
+        apiService = apiService,
+        sessionManager = sessionManager,
+        readStore = privacyNoticeReadStore,
+    ) {
         applicationContext.assets.open("legal/privacy-notice-2026-10-18.md")
             .bufferedReader()
             .use { it.readText() }
@@ -82,6 +88,7 @@ class AppContainer(context: Context) {
         patientIdentityStore = patientIdentityStore,
         supervisorNotificationSettingsStore = supervisorNotificationSettingsStore,
         clearInMemoryState = supervisorRepository::clearSessionMemory,
+        privacyNoticeReadStore = privacyNoticeReadStore,
     )
 
     val dataControlRepository = DataControlRepository(

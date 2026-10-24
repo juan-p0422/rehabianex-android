@@ -51,8 +51,7 @@ class PrivacyNoticeViewModel(
                 }
             _uiState.value = if (
                 confirmationRequired &&
-                result.serverStatusChecked &&
-                result.currentReadConfirmedByServer
+                result.accessGranted
             ) {
                 PrivacyNoticeUiState.AccessGranted
             } else {

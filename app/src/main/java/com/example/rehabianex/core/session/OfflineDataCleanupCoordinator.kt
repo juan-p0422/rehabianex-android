@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.app.NotificationManagerCompat
 import com.example.rehabianex.data.local.PatientIdentityStore
 import com.example.rehabianex.data.local.SupervisorNotificationSettingsStore
+import com.example.rehabianex.data.local.PrivacyNoticeReadStore
 import com.example.rehabianex.data.local.db.RehabiAnexDatabase
 import com.example.rehabianex.notifications.AgendaNotificationHelper
 import com.example.rehabianex.notifications.NotificationRescheduleWorker
@@ -23,6 +24,7 @@ class OfflineDataCleanupCoordinator(
     private val database: RehabiAnexDatabase,
     private val patientIdentityStore: PatientIdentityStore,
     private val supervisorNotificationSettingsStore: SupervisorNotificationSettingsStore,
+    private val privacyNoticeReadStore: PrivacyNoticeReadStore,
     private val clearInMemoryState: () -> Unit = {},
 ) {
     private val applicationContext = context.applicationContext
@@ -64,6 +66,7 @@ class OfflineDataCleanupCoordinator(
             }
             runCatching { patientIdentityStore.clearOwner(uid) }
             runCatching { supervisorNotificationSettingsStore.clearOwner(uid) }
+            runCatching { privacyNoticeReadStore.clearOwner(uid) }
         }
 
         NotificationManagerCompat.from(applicationContext).cancelAll()
