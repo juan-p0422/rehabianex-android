@@ -137,14 +137,14 @@ class AuthModelsTest {
                 gender = "female",
                 age = 29,
                 privacyNoticeAccepted = true,
-                privacyNoticeVersion = "2026-10-18",
+                privacyNoticeVersion = "2026-10-30",
             ),
         )
 
         assertTrue(json.contains("\"full_name\":\"Paciente Prueba\""))
         assertTrue(json.contains("\"gender\":\"female\""))
         assertTrue(json.contains("\"privacy_notice_accepted\":true"))
-        assertTrue(json.contains("\"privacy_notice_version\":\"2026-10-18\""))
+        assertTrue(json.contains("\"privacy_notice_version\":\"2026-10-30\""))
         assertFalse(json.contains("supervisor_type"))
     }
 

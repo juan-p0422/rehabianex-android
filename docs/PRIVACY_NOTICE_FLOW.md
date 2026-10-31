@@ -1,64 +1,50 @@
-# Aviso de privacidad y consentimiento de supervisión
+# Aviso de privacidad y consentimientos separados
 
-Última actualización: 2026-08-03.
+Última actualización: 2026-10-30.
 
-## Aviso de privacidad en registro
+## Versión vigente
 
-La versión vigente integrada en Android es `2026-08-01`. El registro queda
-bloqueado hasta que la persona marque de forma explícita la aceptación del
-tratamiento de datos. Al validar el formulario, Android envía siempre:
+La versión integrada en Android es `2026-10-30`. El registro convencional muestra el aviso antes de aportar datos personales y envía, después de la decisión explícita de la persona:
 
 ```json
 {
   "privacy_notice_accepted": true,
-  "privacy_notice_version": "2026-08-01"
+  "privacy_notice_version": "2026-10-30"
 }
 ```
 
-La UI explica que esta aceptación permite tratar los datos necesarios para
-crear y operar la cuenta. También muestra de forma visible que RehabiAnex no
-sustituye atención médica, psicológica ni terapéutica.
+`AuthValidator` rechaza el registro sin esa decisión y Laravel valida exactamente la versión vigente. Esto no sustituye el consentimiento separado para datos sensibles del seguimiento.
 
-Existe una doble protección:
+## Cuentas existentes y lectura
 
-1. El botón `Registrar` permanece deshabilitado sin aceptación.
-2. `AuthValidator` rechaza cualquier intento programático con
-   `acceptedPrivacy=false`, por lo que no se llama al repositorio ni al backend.
+Una cuenta cuya evidencia corresponde a `2026-10-28` u otra versión anterior debe ver el aviso `2026-10-30` antes de volver al panel y confirmar únicamente su lectura. La evidencia se guarda por UID y versión después de que Laravel la confirme.
 
-Si backend responde `422` para `privacy_notice_accepted` o
-`privacy_notice_version`, `ApiErrorParser` asocia el detalle al control de
-privacidad y la pantalla muestra el mensaje seguro entregado por backend.
+La confirmación fallida mantiene el aviso abierto y no concede acceso. Si ya existe evidencia local para la versión vigente y el servidor falla de manera transitoria, la política offline permite continuar con una advertencia; una evidencia antigua, de otro UID o invalidada por una respuesta autoritativa no permite continuar.
 
-## Separación respecto a supervisión
+La relectura desde el perfil es informativa y no muestra controles de confirmación. Las evidencias históricas permanecen en backend; cambiar de versión no reescribe resultados anteriores.
 
-La aceptación del aviso no vincula supervisores, no concede acceso a datos y no
-crea un consentimiento de supervisión.
+## Separación de decisiones
 
-Después del registro de paciente se presenta una configuración opcional con dos
-resultados distintos:
+Se registran y evalúan por separado:
 
-- `Configurar supervisión`: abre el flujo de código/vinculación. El usuario aún
-  debe revisar y confirmar la solicitud y sus permisos.
-- `Continuar sin supervisor`: abre Patient Home sin crear vinculación ni
-  consentimiento.
+- aceptación del aviso para el tratamiento necesario durante un registro nuevo;
+- confirmación de lectura de la versión vigente para una cuenta existente;
+- consentimiento expreso para datos sensibles de seguimiento;
+- consentimiento y alcances de supervisión;
+- permisos Android, incluidas notificaciones.
 
-El consentimiento de supervisión continúa gestionándose mediante los endpoints
-de supervisión y `consents`; no forma parte del payload de registro.
+Confirmar la lectura de una versión nueva no activa retroactivamente un tratamiento, supervisor, alcance o permiso Android.
 
 ## Archivos responsables
 
-- `data/model/AuthModels.kt`: campos y versión contractual.
-- `validation/AuthValidator.kt`: bloqueo defensivo y construcción del request.
-- `ui/screens/auth/RegisterScreen.kt`: aceptación explícita y textos legales.
-- `ui/screens/auth/ConsentScreen.kt`: decisión opcional de supervisión.
-- `navigation/RehabianexNavHost.kt`: destinos distintos para configurar u omitir.
-- `data/remote/ApiErrorParser.kt`: errores `422` asociados al checkbox.
+- `app/src/main/assets/legal/privacy-notice-2026-10-30.md`: texto editable vigente.
+- `data/model/AuthModels.kt`: versión enviada por Android.
+- `validation/AuthValidator.kt`: validación defensiva del registro.
+- `data/repository/PrivacyNoticeRepository.kt`: aviso remoto/local, evidencia por versión y política offline.
+- `ui/screens/privacy/PrivacyNoticeScreen.kt`: lectura requerida y relectura informativa.
+- `ui/screens/auth/RegisterScreen.kt`: acceso al aviso y decisión del registro.
+- `core/network/PrivacyNoticeRequiredInterceptor.kt`: precondición de lectura vigente.
 
-## Riesgos y mantenimiento
+## Mantenimiento
 
-- Cuando cambie la versión oficial del aviso deben actualizarse conjuntamente el
-  contrato backend, `PRIVACY_NOTICE_VERSION`, los textos legales aprobados y las
-  pruebas.
-- La ruta interna sigue llamándose `Consent` por compatibilidad de navegación,
-  aunque su pantalla ahora representa configuración opcional de supervisión.
-  Puede renombrarse en una migración posterior sin cambiar el comportamiento.
+Un cambio material exige actualizar coordinadamente Android, Laravel, el activo legal y las pruebas. No debe reutilizarse la evidencia de otra versión ni cambiarse el consentimiento sensible o de supervisión salvo que el propio cambio lo requiera y se explique por separado.

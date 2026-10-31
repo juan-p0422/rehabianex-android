@@ -236,7 +236,7 @@ class PrivacyNoticeRepository(
         return PrivacyNoticeDto(
             title = "Aviso de Privacidad de RehabiAnex",
             version = PRIVACY_NOTICE_VERSION,
-            publishedOn = "2026-10-18",
+            publishedOn = "2026-10-30",
             content = content,
             responsibleStatus = "pending_confirmation",
             contactStatus = "pending_confirmation",

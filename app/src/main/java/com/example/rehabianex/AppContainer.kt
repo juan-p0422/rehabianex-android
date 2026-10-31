@@ -46,7 +46,7 @@ class AppContainer(context: Context) {
         sessionManager = sessionManager,
         readStore = privacyNoticeReadStore,
     ) {
-        applicationContext.assets.open("legal/privacy-notice-2026-10-18.md")
+        applicationContext.assets.open("legal/privacy-notice-2026-10-30.md")
             .bufferedReader()
             .use { it.readText() }
     }

@@ -488,7 +488,7 @@ class PrivacyNoticeRepositoryTest {
         profile = SessionProfileDto(
             privacyNoticeRead = PrivacyNoticeReadDto(
                 privacyNoticeVersion = CURRENT_VERSION,
-                confirmedAt = "2026-10-18T12:00:00-06:00",
+                confirmedAt = "2026-10-30T12:00:00-06:00",
                 status = "confirmed",
                 isCurrent = true,
             ),
@@ -548,7 +548,7 @@ class PrivacyNoticeRepositoryTest {
     }
 
     private companion object {
-        const val CURRENT_VERSION = "2026-10-18"
+        const val CURRENT_VERSION = "2026-10-30"
         const val OWNER_A = "synthetic-owner-a"
         const val OWNER_B = "synthetic-owner-b"
     }

@@ -26,7 +26,7 @@ data class RegisterRequest(
     val privacyNoticeVersion: String,
 )
 
-const val PRIVACY_NOTICE_VERSION = "2026-10-18"
+const val PRIVACY_NOTICE_VERSION = "2026-10-30"
 
 data class RefreshRequest(
     @SerializedName("refresh_token")
