@@ -12,6 +12,7 @@
         <exclude domain="sharedpref" path="adaptive_support_state.xml"/>
         <exclude domain="sharedpref" path="rehabianex_fcm_lifecycle.xml"/>
         <exclude domain="sharedpref" path="rehabianex_fcm_delivery_state.xml"/>
+        <exclude domain="sharedpref" path="privacy_notice_read_evidence.xml"/>
         <exclude domain="database" path="rehabianex-offline.db"/>
         <exclude domain="database" path="rehabianex-offline.db-shm"/>
         <exclude domain="database" path="rehabianex-offline.db-wal"/>
@@ -25,6 +26,7 @@
         <exclude domain="sharedpref" path="adaptive_support_state.xml"/>
         <exclude domain="sharedpref" path="rehabianex_fcm_lifecycle.xml"/>
         <exclude domain="sharedpref" path="rehabianex_fcm_delivery_state.xml"/>
+        <exclude domain="sharedpref" path="privacy_notice_read_evidence.xml"/>
         <exclude domain="database" path="rehabianex-offline.db"/>
         <exclude domain="database" path="rehabianex-offline.db-shm"/>
         <exclude domain="database" path="rehabianex-offline.db-wal"/>
