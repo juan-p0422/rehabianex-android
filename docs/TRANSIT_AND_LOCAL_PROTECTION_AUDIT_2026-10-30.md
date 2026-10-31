@@ -4,7 +4,7 @@ Fecha de verificación: 2026-10-30 (America/Mexico_City)
 
 Android: rama `codex/transit-local-protection`, base `03ff60a`, versión declarada `1.0` (`versionCode 1`)
 
-Backend: rama `codex/closed-beta-backend-prep`, base `0f6b612`
+Backend: rama `codex/closed-beta-backend-prep`, cambio de esta tarea `e092a98` (base previa `0f6b612`)
 
 Entorno remoto comprobado: `https://rehabianex-api.onrender.com/api/`
 
