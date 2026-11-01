@@ -33,11 +33,13 @@ object ApiErrorParser {
                     ?.entrySet()
                     ?.asSequence()
                     ?.take(MAX_FIELD_ERRORS)
-                    ?.associate { (field, value) ->
-                        field.toUiField() to (
+                    ?.fold(linkedMapOf<String, String>()) { mapped, (field, value) ->
+                        mapped.putIfAbsent(
+                            field.toUiField(),
                             ErrorMapper.safeBackendMessage(422, value.firstMessage())
-                                ?: "Revisa este dato."
+                                ?: "Revisa este dato.",
                             )
+                        mapped
                     }
                     .orEmpty()
             } else {
