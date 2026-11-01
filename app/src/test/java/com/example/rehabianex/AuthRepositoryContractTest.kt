@@ -697,6 +697,8 @@ class AuthRepositoryContractTest {
         phone = "+524490000000",
         privacyNoticeAccepted = true,
         privacyNoticeVersion = "2026-10-30",
+        sensitiveDataConsentAccepted = true,
+        sensitiveDataConsentVersion = "2026-10-27",
     )
 
     private fun apiServiceReturning(responseBody: AuthResponse): ApiService {

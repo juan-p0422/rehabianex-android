@@ -60,6 +60,8 @@ class AuthValidatorTest {
         assertEquals(null, result.value?.supervisorType)
         assertTrue(result.value?.privacyNoticeAccepted == true)
         assertEquals("2026-10-30", result.value?.privacyNoticeVersion)
+        assertTrue(result.value?.sensitiveDataConsentAccepted == true)
+        assertEquals("2026-10-27", result.value?.sensitiveDataConsentVersion)
     }
 
     @Test
@@ -78,6 +80,8 @@ class AuthValidatorTest {
         assertEquals("clinical_psychologist", result.value?.supervisorType)
         assertEquals(null, result.value?.gender)
         assertEquals(null, result.value?.age)
+        assertEquals(null, result.value?.sensitiveDataConsentAccepted)
+        assertEquals(null, result.value?.sensitiveDataConsentVersion)
     }
 
     @Test
@@ -104,6 +108,34 @@ class AuthValidatorTest {
         assertEquals("Debes aceptar el aviso de privacidad.", result.fieldErrors["privacy"])
     }
 
+    @Test
+    fun register_rejectsMissingSensitiveDataConsentForPatientOnly() {
+        val patient = AuthValidator.validateRegister(
+            validPatient().copy(acceptedSensitiveData = false),
+        )
+        val supervisor = AuthValidator.validateRegister(
+            validPatient().copy(
+                role = "supervisor",
+                gender = "",
+                age = "",
+                supervisorType = "clinical_psychologist",
+                acceptedSensitiveData = false,
+            ),
+        )
+
+        assertFalse(patient.isValid)
+        assertTrue(patient.fieldErrors.containsKey("sensitiveDataConsent"))
+        assertTrue(supervisor.isValid)
+    }
+
+    @Test
+    fun register_rejectsPatientUnderClosedBetaMinimumAge() {
+        val result = AuthValidator.validateRegister(validPatient().copy(age = "17"))
+
+        assertFalse(result.isValid)
+        assertEquals("Ingresa una edad entre 18 y 120 años.", result.fieldErrors["age"])
+    }
+
     private fun validPatient() = RegisterFormInput(
         fullName = "Paciente Prueba",
         email = "paciente@example.com",
@@ -115,5 +147,6 @@ class AuthValidatorTest {
         age = "29",
         supervisorType = "",
         acceptedPrivacy = true,
+        acceptedSensitiveData = true,
     )
 }

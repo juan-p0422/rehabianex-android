@@ -3,6 +3,7 @@ package com.example.rehabianex.validation
 import com.example.rehabianex.data.model.LoginRequest
 import com.example.rehabianex.data.model.PRIVACY_NOTICE_VERSION
 import com.example.rehabianex.data.model.RegisterRequest
+import com.example.rehabianex.data.model.SENSITIVE_DATA_CONSENT_VERSION
 import java.util.Locale
 
 data class LoginFormInput(
@@ -21,6 +22,7 @@ data class RegisterFormInput(
     val age: String,
     val supervisorType: String,
     val acceptedPrivacy: Boolean,
+    val acceptedSensitiveData: Boolean = false,
     val phoneRegion: String = PHONE_REGION_MEXICO,
     val supervisorTypeOther: String = "",
 )
@@ -123,6 +125,11 @@ object AuthValidator {
             errors["privacy"] = "Debes aceptar el aviso de privacidad."
         }
 
+        if (input.role == ROLE_PATIENT && !input.acceptedSensitiveData) {
+            errors["sensitiveDataConsent"] =
+                "Debes decidir y aceptar el tratamiento de datos sensibles para usar el seguimiento."
+        }
+
         return if (errors.isEmpty()) {
             ValidationResult(
                 value = RegisterRequest(
@@ -137,6 +144,12 @@ object AuthValidator {
                     supervisorTypeOther = supervisorTypeOther,
                     privacyNoticeAccepted = true,
                     privacyNoticeVersion = PRIVACY_NOTICE_VERSION,
+                    sensitiveDataConsentAccepted = if (input.role == ROLE_PATIENT) true else null,
+                    sensitiveDataConsentVersion = if (input.role == ROLE_PATIENT) {
+                        SENSITIVE_DATA_CONSENT_VERSION
+                    } else {
+                        null
+                    },
                 ),
             )
         } else {
@@ -181,6 +194,6 @@ object AuthValidator {
     private const val MAX_EMAIL_LENGTH = 254
     private const val MIN_PASSWORD_LENGTH = 8
     private const val MAX_PASSWORD_LENGTH = 128
-    private const val MIN_AGE = 13
+    private const val MIN_AGE = 18
     private const val MAX_AGE = 120
 }

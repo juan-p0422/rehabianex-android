@@ -66,6 +66,8 @@ object ApiErrorParser {
             "patient_uid" -> "patientUid"
             "supervisor_uid" -> "supervisorUid"
             "privacy_notice_accepted", "privacy_notice_version" -> "privacy"
+            "sensitive_data_consent_accepted", "sensitive_data_consent_version" ->
+                "sensitiveDataConsent"
             else -> safeField.split('_')
             .filter(String::isNotBlank)
             .mapIndexed { index, part ->

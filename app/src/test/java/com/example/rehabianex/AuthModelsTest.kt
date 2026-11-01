@@ -138,6 +138,8 @@ class AuthModelsTest {
                 age = 29,
                 privacyNoticeAccepted = true,
                 privacyNoticeVersion = "2026-10-30",
+                sensitiveDataConsentAccepted = true,
+                sensitiveDataConsentVersion = "2026-10-27",
             ),
         )
 
@@ -145,6 +147,8 @@ class AuthModelsTest {
         assertTrue(json.contains("\"gender\":\"female\""))
         assertTrue(json.contains("\"privacy_notice_accepted\":true"))
         assertTrue(json.contains("\"privacy_notice_version\":\"2026-10-30\""))
+        assertTrue(json.contains("\"sensitive_data_consent_accepted\":true"))
+        assertTrue(json.contains("\"sensitive_data_consent_version\":\"2026-10-27\""))
         assertFalse(json.contains("supervisor_type"))
     }
 
@@ -164,5 +168,22 @@ class AuthModelsTest {
 
         assertEquals("Este correo ya está registrado.", result.fieldErrors["email"])
         assertEquals("El nombre es obligatorio.", result.fieldErrors["fullName"])
+    }
+
+    @Test
+    fun apiErrorParser_mapsSensitiveConsentErrorsWithoutClearingFormState() {
+        val body = """
+            {
+              "message": "Falta el consentimiento sensible.",
+              "errors": {
+                "sensitive_data_consent_accepted": ["Debes aceptar expresamente."],
+                "sensitive_data_consent_version": ["La versión no está vigente."]
+              }
+            }
+        """.trimIndent().toResponseBody("application/json".toMediaType())
+
+        val result = ApiErrorParser.parse(body)
+
+        assertEquals("Debes aceptar expresamente.", result.fieldErrors["sensitiveDataConsent"])
     }
 }

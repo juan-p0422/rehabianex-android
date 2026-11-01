@@ -30,6 +30,7 @@ import com.example.rehabianex.ui.components.SoftCard
 import com.example.rehabianex.ui.components.WarningCard
 import com.example.rehabianex.ui.theme.RehabianexColors
 import com.example.rehabianex.data.model.PRIVACY_NOTICE_VERSION
+import com.example.rehabianex.data.model.SENSITIVE_DATA_CONSENT_VERSION
 import com.example.rehabianex.validation.RegisterFormInput
 import com.example.rehabianex.validation.PHONE_REGION_MEXICO
 import com.example.rehabianex.validation.SUPERVISOR_TYPE_OPTIONS
@@ -56,6 +57,7 @@ fun RegisterScreen(
     }
     var supervisorTypeOther by rememberSaveable { mutableStateOf("") }
     var acceptedPrivacy by rememberSaveable { mutableStateOf(false) }
+    var acceptedSensitiveData by rememberSaveable { mutableStateOf(false) }
     val fieldErrors = (uiState as? AuthUiState.Error)?.fieldErrors.orEmpty()
     val isLoading = uiState is AuthUiState.Loading
 
@@ -267,6 +269,34 @@ fun RegisterScreen(
                 color = MaterialTheme.colorScheme.error,
             )
         }
+        if (role == "patient") {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = acceptedSensitiveData,
+                    onCheckedChange = {
+                        acceptedSensitiveData = it
+                        onInputChanged()
+                    },
+                    enabled = !isLoading,
+                )
+                Text(
+                    text = "Acepto de forma separada el tratamiento de mis datos sensibles " +
+                        "de seguimiento (versión $SENSITIVE_DATA_CONSENT_VERSION).",
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            }
+            fieldErrors["sensitiveDataConsent"]?.let {
+                Text(
+                    text = it,
+                    modifier = Modifier.padding(start = 12.dp),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
         Spacer(Modifier.height(8.dp))
         SoftCard {
             Text(
@@ -304,6 +334,7 @@ fun RegisterScreen(
                         age = age,
                         supervisorType = supervisorType,
                         acceptedPrivacy = acceptedPrivacy,
+                        acceptedSensitiveData = acceptedSensitiveData,
                         phoneRegion = phoneRegion,
                         supervisorTypeOther = supervisorTypeOther,
                     ),

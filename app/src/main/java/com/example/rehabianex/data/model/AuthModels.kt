@@ -24,9 +24,14 @@ data class RegisterRequest(
     val privacyNoticeAccepted: Boolean,
     @SerializedName("privacy_notice_version")
     val privacyNoticeVersion: String,
+    @SerializedName("sensitive_data_consent_accepted")
+    val sensitiveDataConsentAccepted: Boolean? = null,
+    @SerializedName("sensitive_data_consent_version")
+    val sensitiveDataConsentVersion: String? = null,
 )
 
 const val PRIVACY_NOTICE_VERSION = "2026-10-30"
+const val SENSITIVE_DATA_CONSENT_VERSION = "2026-10-27"
 
 data class RefreshRequest(
     @SerializedName("refresh_token")
