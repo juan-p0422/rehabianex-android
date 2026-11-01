@@ -95,17 +95,25 @@ internal class PlaintextDatabaseMigrator(
                 database.rawExecSQL("ATTACH DATABASE '$targetPath' AS encrypted KEY \"x'$keyHex'\"")
                 database.rawQuery(
                     "SELECT sqlcipher_export('encrypted')",
-                    emptyArray<String>(),
+                    *emptyArray<Any>(),
                 ).use { cursor ->
-                    while (cursor.moveToNext()) Unit
+                    check(cursor.moveToFirst()) { "La exportación cifrada no produjo resultado." }
                 }
-                database.rawExecSQL("PRAGMA encrypted.user_version = $version")
                 database.setTransactionSuccessful()
             } finally {
                 database.endTransaction()
             }
         } finally {
             database.close()
+        }
+        CipherSQLiteDatabase.openDatabase(
+            target.path,
+            passphrase.copyOf(),
+            null,
+            CipherSQLiteDatabase.OPEN_READWRITE,
+            null,
+        ).use { encrypted ->
+            encrypted.rawExecSQL("PRAGMA user_version = $version")
         }
     }
 

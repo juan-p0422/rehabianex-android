@@ -16,6 +16,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -249,6 +251,9 @@ fun RegisterScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Checkbox(
+                modifier = Modifier.semantics {
+                    contentDescription = "Aceptar Aviso de Privacidad"
+                },
                 checked = acceptedPrivacy,
                 onCheckedChange = {
                     acceptedPrivacy = it
@@ -276,6 +281,9 @@ fun RegisterScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Checkbox(
+                    modifier = Modifier.semantics {
+                        contentDescription = "Aceptar tratamiento de datos sensibles"
+                    },
                     checked = acceptedSensitiveData,
                     onCheckedChange = {
                         acceptedSensitiveData = it

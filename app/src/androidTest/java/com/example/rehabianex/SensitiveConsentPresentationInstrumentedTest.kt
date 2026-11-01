@@ -6,7 +6,9 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.example.rehabianex.ui.screens.auth.RegisterScreen
@@ -39,11 +41,13 @@ class SensitiveConsentPresentationInstrumentedTest {
         ).assertExists()
         composeRule.onNodeWithText("Registrar").assertIsNotEnabled()
 
-        composeRule.onAllNodes(unchecked)[0].performClick()
-        // Privacy gates submission; the separate sensitive decision remains
-        // unchecked so the validator can display its focused error on submit.
+        composeRule.onNodeWithContentDescription("Aceptar Aviso de Privacidad").performClick()
+        // Privacy gates submission; the independent sensitive decision is
+        // validated on submit so its focused error can be shown.
         composeRule.onNodeWithText("Registrar").assertIsEnabled()
-        composeRule.onAllNodes(unchecked)[0].performClick()
+        composeRule.onNodeWithContentDescription("Aceptar tratamiento de datos sensibles").performClick()
+        composeRule.onNodeWithContentDescription("Aceptar Aviso de Privacidad").assertIsOn()
+        composeRule.onNodeWithContentDescription("Aceptar tratamiento de datos sensibles").assertIsOn()
         composeRule.onNodeWithText("Registrar").assertIsEnabled()
     }
 
