@@ -33,6 +33,9 @@ val betaSigningValues = listOf(
     betaKeyPassword,
 )
 val hasCompleteBetaSigning = betaSigningValues.all { !it.isNullOrBlank() }
+val allowUnsignedCiRelease =
+    providers.environmentVariable("GITHUB_ACTIONS").orNull == "true" &&
+        providers.environmentVariable("REHABIANEX_CI_UNSIGNED_RELEASE").orNull == "true"
 require(betaSigningValues.all { it.isNullOrBlank() } || hasCompleteBetaSigning) {
     "La configuración de firma beta está incompleta."
 }
@@ -103,7 +106,11 @@ android {
 }
 
 tasks.configureEach {
-    if (name in setOf("assembleRelease", "bundleRelease", "packageRelease") && !hasCompleteBetaSigning) {
+    if (
+        name in setOf("assembleRelease", "bundleRelease", "packageRelease") &&
+        !hasCompleteBetaSigning &&
+        !allowUnsignedCiRelease
+    ) {
         doFirst {
             error("La variante release requiere la identidad de firma beta privada.")
         }

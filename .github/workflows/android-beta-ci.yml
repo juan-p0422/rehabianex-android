@@ -23,9 +23,18 @@ jobs:
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
       - name: Unit tests and release compilation
+        env:
+          REHABIANEX_CI_UNSIGNED_RELEASE: "true"
         run: >-
           ./gradlew --no-daemon
           testDebugUnitTest
           compileDebugAndroidTestKotlin
-          compileReleaseKotlin
+          assembleRelease
           lintRelease
+      - name: Preserve unsigned release for local private signing
+        uses: actions/upload-artifact@v5
+        with:
+          name: rehabianex-release-unsigned
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 1
