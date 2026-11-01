@@ -22,6 +22,21 @@ require(configuredApiBaseUrl == officialRenderApiBaseUrl) {
     "REHABIANEX_API_BASE_URL solo admite la API oficial de Render."
 }
 
+val betaKeystorePath = providers.environmentVariable("REHABIANEX_BETA_KEYSTORE").orNull
+val betaKeystorePassword = providers.environmentVariable("REHABIANEX_BETA_STORE_PASSWORD").orNull
+val betaKeyAlias = providers.environmentVariable("REHABIANEX_BETA_KEY_ALIAS").orNull
+val betaKeyPassword = providers.environmentVariable("REHABIANEX_BETA_KEY_PASSWORD").orNull
+val betaSigningValues = listOf(
+    betaKeystorePath,
+    betaKeystorePassword,
+    betaKeyAlias,
+    betaKeyPassword,
+)
+val hasCompleteBetaSigning = betaSigningValues.all { !it.isNullOrBlank() }
+require(betaSigningValues.all { it.isNullOrBlank() } || hasCompleteBetaSigning) {
+    "La configuración de firma beta está incompleta."
+}
+
 android {
     namespace = "com.example.rehabianex"
     compileSdk {
@@ -34,10 +49,25 @@ android {
         applicationId = "com.example.rehabianex"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.0-beta.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    val betaSigning = if (hasCompleteBetaSigning) {
+        signingConfigs.create("beta") {
+            storeFile = file(requireNotNull(betaKeystorePath))
+            storePassword = requireNotNull(betaKeystorePassword)
+            keyAlias = requireNotNull(betaKeyAlias)
+            keyPassword = requireNotNull(betaKeyPassword)
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
+        }
+    } else {
+        null
     }
 
     buildTypes {
@@ -54,6 +84,7 @@ android {
             matchingFallbacks += listOf("debug")
         }
         release {
+            signingConfig = betaSigning
             buildConfigField("String", "API_BASE_URL", "\"$configuredApiBaseUrl\"")
             buildConfigField("boolean", "ADMIN_PANEL_ENABLED", "false")
             optimization {
@@ -68,6 +99,14 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+tasks.configureEach {
+    if (name in setOf("assembleRelease", "bundleRelease", "packageRelease") && !hasCompleteBetaSigning) {
+        doFirst {
+            error("La variante release requiere la identidad de firma beta privada.")
+        }
     }
 }
 
