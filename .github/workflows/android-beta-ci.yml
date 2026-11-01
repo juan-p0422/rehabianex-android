@@ -23,4 +23,9 @@ jobs:
       - name: Prepare Gradle wrapper
         run: chmod +x gradlew
       - name: Unit tests and release compilation
-        run: ./gradlew --no-daemon testDebugUnitTest compileReleaseKotlin lintRelease
+        run: >-
+          ./gradlew --no-daemon
+          testDebugUnitTest
+          compileDebugAndroidTestKotlin
+          compileReleaseKotlin
+          lintRelease

@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.room.Room
 import com.example.rehabianex.core.session.OfflineDataCleanupCoordinator
 import com.example.rehabianex.data.local.PatientIdentityStore
+import com.example.rehabianex.data.local.PendingDeactivationCleanupStore
 import com.example.rehabianex.data.local.SharedPreferencesPrivacyNoticeReadStore
 import com.example.rehabianex.data.local.SupervisorNotificationSettingsStore
 import com.example.rehabianex.data.local.db.PatientSummaryEntity
@@ -166,6 +167,39 @@ class EncryptedRoomDatabaseInstrumentedTest {
         assertNull(database!!.patientSummaryDao().get("owner-b"))
         assertNull(database!!.patientProfileDao().get("owner-b"))
         assertNull(privacyNoticeReadStore.confirmedVersion("owner-b"))
+    }
+
+    @Test
+    fun pendingAccountDeactivationCleanupSurvivesCoordinatorRecreationAndRetries() = runBlocking {
+        database = RehabiAnexDatabase.buildEncryptedDatabaseForTest(
+            context,
+            TEST_DATABASE_NAME,
+        )
+        val pendingRequest = CreatePatientNoteRequest(
+            mood = "neutral",
+            moodScore = 5,
+            anxietyLevel = 2,
+            cravingLevel = 1,
+            hadRelapse = false,
+        )
+        database!!.patientNoteDao().upsert(pendingRequest.toPendingEntity("deactivated-owner"))
+        val pendingStore = PendingDeactivationCleanupStore(context).apply {
+            clear()
+            save("deactivated-owner", "patient")
+        }
+        val recreatedCoordinator = OfflineDataCleanupCoordinator(
+            context = context,
+            database = database!!,
+            patientIdentityStore = PatientIdentityStore(context),
+            supervisorNotificationSettingsStore = SupervisorNotificationSettingsStore(context),
+            privacyNoticeReadStore = SharedPreferencesPrivacyNoticeReadStore(context),
+            pendingDeactivationCleanupStore = PendingDeactivationCleanupStore(context),
+        )
+
+        recreatedCoordinator.retryPendingAccountDeactivationCleanup()
+
+        assertEquals(0, database!!.patientNoteDao().pendingCount("deactivated-owner"))
+        assertNull(pendingStore.load())
     }
 
     private fun profile(ownerUid: String, displayName: String) = PatientProfileEntity(
