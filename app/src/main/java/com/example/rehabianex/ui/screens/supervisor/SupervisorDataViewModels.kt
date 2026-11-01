@@ -393,6 +393,7 @@ class SupervisorProfileViewModel(
                     phone = profile.phone,
                     supervisorType = checkNotNull(profile.supervisorType),
                     supervisorTypeOther = profile.supervisorTypeOther,
+                    phoneChanged = profile.phoneChanged,
                 )
             ) {
                 is SupervisorDataResult.Success -> {

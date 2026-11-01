@@ -14,6 +14,7 @@ import com.example.rehabianex.data.model.SessionProfileDto
 import com.example.rehabianex.data.model.StorePatientNoteResponse
 import com.example.rehabianex.data.model.SupervisionRequestDto
 import com.example.rehabianex.data.model.UpdatePatientRequest
+import com.example.rehabianex.data.model.UpdateSupervisorRequest
 import com.example.rehabianex.data.remote.ApiService
 import com.example.rehabianex.data.repository.PatientDataResult
 import com.example.rehabianex.data.repository.PatientRepository
@@ -31,6 +32,28 @@ import org.junit.Test
 import retrofit2.Response
 
 class PatientUpdateContractTest {
+    @Test
+    fun profilePatch_omitsUnchangedPhoneAndIncludesEditedPhone() {
+        val gson = Gson()
+        val patientWithoutPhone = gson.toJsonTree(
+            UpdatePatientRequest(fullName = "Paciente Histórico", phone = null),
+        ).asJsonObject
+        val supervisorWithoutPhone = gson.toJsonTree(
+            UpdateSupervisorRequest(
+                fullName = "Supervisor Histórico",
+                phone = null,
+                supervisorType = "psychologist",
+            ),
+        ).asJsonObject
+        val patientWithPhone = gson.toJsonTree(
+            UpdatePatientRequest(fullName = "Paciente Actualizado", phone = "+524491234567"),
+        ).asJsonObject
+
+        assertFalse(patientWithoutPhone.has("phone"))
+        assertFalse(supervisorWithoutPhone.has("phone"))
+        assertEquals("+524491234567", patientWithPhone.get("phone").asString)
+    }
+
     @Test
     fun updatePatientRequest_serializesOnlyBackendAllowedFields() {
         val payload = Gson().toJsonTree(

@@ -7,6 +7,7 @@ data class EditableProfileFormInput(
     val fullName: String,
     val phone: String,
     val phoneRegion: String,
+    val originalPhone: String? = null,
     val supervisorType: String? = null,
     val supervisorTypeOther: String = "",
     val sobrietyStartDate: String? = null,
@@ -15,6 +16,7 @@ data class EditableProfileFormInput(
 data class EditableProfileValue(
     val fullName: String,
     val phone: String,
+    val phoneChanged: Boolean,
     val supervisorType: String? = null,
     val supervisorTypeOther: String? = null,
     val sobrietyStartDate: String? = null,
@@ -29,7 +31,16 @@ object ProfileFormValidator {
         val fullName = normalizeHumanName(input.fullName)
         validateHumanName(fullName)?.let { errors["fullName"] = it }
 
-        val phone = PhoneNumberValidator.validate(input.phoneRegion, input.phone)
+        val phoneChanged = !PhoneNumberValidator.matchesStoredInput(
+            stored = input.originalPhone,
+            region = input.phoneRegion,
+            input = input.phone,
+        )
+        val phone = if (phoneChanged) {
+            PhoneNumberValidator.validate(input.phoneRegion, input.phone)
+        } else {
+            PhoneValidationResult(value = input.originalPhone)
+        }
         phone.error?.let { errors["phone"] = it }
         val sobrietyStartDate = input.sobrietyStartDate?.trim()?.takeIf { it.isNotEmpty() }
         if (input.sobrietyStartDate != null && sobrietyStartDate == null) {
@@ -53,6 +64,7 @@ object ProfileFormValidator {
                 EditableProfileValue(
                     fullName = fullName,
                     phone = checkNotNull(phone.value),
+                    phoneChanged = phoneChanged,
                     supervisorType = supervisorType.first,
                     supervisorTypeOther = supervisorType.second,
                     sobrietyStartDate = sobrietyStartDate,

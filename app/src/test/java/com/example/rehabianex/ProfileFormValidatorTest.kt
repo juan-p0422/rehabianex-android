@@ -3,6 +3,7 @@ package com.example.rehabianex
 import com.example.rehabianex.validation.EditableProfileFormInput
 import com.example.rehabianex.validation.PHONE_REGION_MEXICO
 import com.example.rehabianex.validation.ProfileFormValidator
+import com.example.rehabianex.validation.PhoneNumberValidator
 import com.example.rehabianex.validation.SUPERVISOR_TYPE_OTHER
 import com.example.rehabianex.validation.SUPERVISOR_TYPE_OPTIONS
 import com.example.rehabianex.validation.CONTACT_RELATIONSHIP_OPTIONS
@@ -87,6 +88,45 @@ class ProfileFormValidatorTest {
         assertTrue(result.isValid)
         assertEquals("María José de la O", result.value?.fullName)
         assertEquals("+524491234567", result.value?.phone)
+        assertTrue(result.value?.phoneChanged == true)
+    }
+
+    @Test
+    fun `unchanged historical phone is preserved without applying current mexico rule`() {
+        val historicalPhone = "+1 (555) 010-0200"
+        val displayed = PhoneNumberValidator.parseStored(historicalPhone)
+
+        val result = ProfileFormValidator.validate(
+            EditableProfileFormInput(
+                fullName = "Paciente Histórico",
+                phone = displayed.number,
+                phoneRegion = displayed.region,
+                originalPhone = historicalPhone,
+            ),
+            includeSupervisorType = false,
+        )
+
+        assertTrue(result.isValid)
+        assertEquals(historicalPhone, result.value?.phone)
+        assertFalse(result.value?.phoneChanged ?: true)
+    }
+
+    @Test
+    fun `editing a historical phone applies the current mexico rule`() {
+        val historicalPhone = "+1 (555) 010-0200"
+
+        val result = ProfileFormValidator.validate(
+            EditableProfileFormInput(
+                fullName = "Paciente Histórico",
+                phone = "123",
+                phoneRegion = PHONE_REGION_MEXICO,
+                originalPhone = historicalPhone,
+            ),
+            includeSupervisorType = false,
+        )
+
+        assertFalse(result.isValid)
+        assertTrue(result.fieldErrors.containsKey("phone"))
     }
 
     @Test

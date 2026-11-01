@@ -162,6 +162,7 @@ class SupervisorRepository(
         phone: String,
         supervisorType: String,
         supervisorTypeOther: String?,
+        phoneChanged: Boolean = true,
     ): SupervisorDataResult<String> = safeRequest(
         defaultUnexpectedMessage = "Ocurrió un error inesperado al actualizar el perfil.",
     ) {
@@ -174,7 +175,7 @@ class SupervisorRepository(
                 supervisorUid = uid,
                 request = UpdateSupervisorRequest(
                     fullName = fullName,
-                    phone = phone,
+                    phone = phone.takeIf { phoneChanged },
                     supervisorType = supervisorType,
                     supervisorTypeOther = supervisorTypeOther,
                 ),

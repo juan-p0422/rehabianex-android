@@ -1208,6 +1208,7 @@ class PatientProfileViewModel(
                     profile.fullName,
                     profile.phone,
                     profile.sobrietyStartDate,
+                    phoneChanged = profile.phoneChanged,
                 )
             ) {
                 is PatientDataResult.Success -> {

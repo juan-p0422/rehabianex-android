@@ -14,6 +14,16 @@ data class PhoneValidationResult(
 )
 
 object PhoneNumberValidator {
+    fun matchesStoredInput(
+        stored: String?,
+        region: String,
+        input: String,
+    ): Boolean {
+        if (stored == null) return false
+        val displayed = parseStored(stored)
+        return displayed.region == region && displayed.number == input
+    }
+
     fun validate(region: String, input: String): PhoneValidationResult {
         val trimmed = input.trim()
         if (trimmed.isBlank()) {

@@ -457,6 +457,7 @@ private fun PatientProfileEditCard(
                         fullName = fullName,
                         phone = phone,
                         phoneRegion = phoneRegion,
+                        originalPhone = profile.phone,
                         sobrietyStartDate = sobrietyStartDate,
                     ),
                 )
@@ -479,6 +480,7 @@ private fun PatientProfileEditCard(
                                 fullName = fullName,
                                 phone = phone,
                                 phoneRegion = phoneRegion,
+                                originalPhone = profile.phone,
                                 sobrietyStartDate = sobrietyStartDate,
                             ),
                         )

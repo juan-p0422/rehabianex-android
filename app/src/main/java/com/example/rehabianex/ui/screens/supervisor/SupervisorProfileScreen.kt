@@ -261,6 +261,7 @@ private fun SupervisorProfileEditCard(
                     fullName = fullName,
                     phone = phone,
                     phoneRegion = phoneRegion,
+                    originalPhone = profile.phone,
                     supervisorType = supervisorType,
                     supervisorTypeOther = supervisorTypeOther,
                 ),

@@ -177,7 +177,7 @@ data class UpdatePatientRequest(
 data class UpdateSupervisorRequest(
     @SerializedName("full_name")
     val fullName: String,
-    val phone: String,
+    val phone: String? = null,
     @SerializedName("supervisor_type")
     val supervisorType: String,
     @SerializedName("supervisor_type_other")

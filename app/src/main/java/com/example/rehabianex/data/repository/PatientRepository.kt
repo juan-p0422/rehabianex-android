@@ -983,6 +983,7 @@ class PatientRepository(
         fullName: String,
         phone: String,
         sobrietyStartDate: String? = null,
+        phoneChanged: Boolean = true,
     ): PatientDataResult<String> {
         if (networkStatusProvider?.isOnline() == false) {
             return PatientDataResult.Failure(
@@ -998,7 +999,7 @@ class PatientRepository(
                     patientUid = patientUid,
                     request = UpdatePatientRequest(
                         fullName = fullName,
-                        phone = phone,
+                        phone = phone.takeIf { phoneChanged },
                         sobrietyStartDate = sobrietyStartDate,
                     ),
                 )
