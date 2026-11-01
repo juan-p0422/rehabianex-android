@@ -11,8 +11,11 @@ data class DataControlSummaryResponse(
     @SerializedName("editable_fields")
     val editableFields: List<String>? = null,
     val rectification: DataControlRectificationDto? = null,
+    @SerializedName("account_deactivation")
+    val accountDeactivation: DataControlAccountDeletionDto? = null,
     @SerializedName("account_deletion")
     val accountDeletion: DataControlAccountDeletionDto? = null,
+    val actions: DataControlActionsDto? = null,
     @SerializedName("retention_notice")
     val retentionNotice: String? = null,
     @SerializedName("manual_request_notice")
@@ -23,7 +26,6 @@ data class DataControlCategoryDto(
     val code: String? = null,
     val label: String? = null,
     val location: String? = null,
-    val exported: Boolean? = null,
     @SerializedName("deletion_mode")
     val deletionMode: String? = null,
 )
@@ -65,6 +67,22 @@ data class DataControlAccountDeletionDto(
     val physicalPurgeAutomatic: Boolean? = null,
 )
 
+data class DataControlActionsDto(
+    @SerializedName("request_permanent_deletion")
+    val requestPermanentDeletion: PermanentDeletionActionDto? = null,
+)
+
+data class PermanentDeletionActionDto(
+    val available: Boolean? = null,
+    val channel: String? = null,
+    val address: String? = null,
+    val subject: String? = null,
+    @SerializedName("automatic_submission")
+    val automaticSubmission: Boolean? = null,
+    @SerializedName("identity_verification_required")
+    val identityVerificationRequired: Boolean? = null,
+)
+
 data class AccountDeletionRequest(
     val scope: String = "account",
     val confirmation: String,
@@ -81,6 +99,8 @@ data class AccountDeletionResponse(
     val localCleanupRequired: Boolean? = null,
     @SerializedName("manual_attention_required")
     val manualAttentionRequired: Boolean? = null,
+    @SerializedName("cleanup_status")
+    val cleanupStatus: Map<String, String>? = null,
     @SerializedName("retention_notice")
     val retentionNotice: String? = null,
 )
@@ -91,6 +111,8 @@ data class AccountDeletionStatusDto(
     val status: String? = null,
     @SerializedName("requested_at")
     val requestedAt: String? = null,
+    @SerializedName("deactivated_at")
+    val deactivatedAt: String? = null,
 )
 
 data class DataControlSummary(
@@ -104,13 +126,14 @@ data class DataControlSummary(
     val confirmationPhrase: String,
     val retentionNotice: String,
     val manualRequestNotice: String,
+    val permanentDeletionEmail: String,
+    val permanentDeletionSubject: String,
 )
 
 data class DataControlCategory(
     val code: String,
     val label: String,
     val location: String,
-    val exported: Boolean,
     val deletionMode: String,
 )
 
@@ -118,6 +141,8 @@ data class AccountDeletionReceipt(
     val requestId: String,
     val status: String,
     val requestedAt: String?,
+    val deactivatedAt: String,
     val manualAttentionRequired: Boolean,
     val retentionNotice: String,
+    val cleanupStatus: Map<String, String>,
 )

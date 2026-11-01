@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.AlertDialog
@@ -33,6 +34,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.rehabianex.BuildConfig
 import com.example.rehabianex.core.session.SessionManager
 import com.example.rehabianex.core.session.SessionInvalidationBus
+import com.example.rehabianex.core.session.PrivacyNoticeRequiredBus
 import com.example.rehabianex.data.repository.AdminRepository
 import com.example.rehabianex.data.repository.AuthRepository
 import com.example.rehabianex.data.repository.DataControlRepository
@@ -40,7 +42,6 @@ import com.example.rehabianex.data.repository.PatientRepository
 import com.example.rehabianex.data.repository.PrivacyNoticeRepository
 import com.example.rehabianex.data.repository.SupervisorRepository
 import com.example.rehabianex.data.repository.FcmDemoRepository
-import com.example.rehabianex.data.export.DataExportFileManager
 import com.example.rehabianex.notifications.NotificationRescheduleWorker
 import com.example.rehabianex.ui.screens.admin.AdminHomeScreen
 import com.example.rehabianex.ui.screens.admin.AdminHomeViewModel
@@ -68,7 +69,6 @@ fun RehabianexNavHost(
     authRepository: AuthRepository,
     privacyNoticeRepository: PrivacyNoticeRepository,
     dataControlRepository: DataControlRepository,
-    dataExportFileManager: DataExportFileManager,
     patientRepository: PatientRepository,
     supervisorRepository: SupervisorRepository,
     fcmDemoRepository: FcmDemoRepository,
@@ -95,6 +95,7 @@ fun RehabianexNavHost(
     var authenticatedPrivacyConfirmedVersion by rememberSaveable { mutableStateOf<String?>(null) }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
+    val latestCurrentRoute by rememberUpdatedState(currentRoute)
 
     fun beginLogout(confirmPendingNotesDeletion: Boolean) {
         if (logoutInProgress) return
@@ -122,6 +123,24 @@ fun RehabianexNavHost(
         SessionInvalidationBus.events.collect { message ->
             authInfoMessage = message
             navController.returnToLogin()
+        }
+    }
+
+    LaunchedEffect(sessionManager, navController) {
+        PrivacyNoticeRequiredBus.events.collect {
+            if (sessionManager.hasActiveSession()) {
+                privacyAccessGranted = false
+                authenticatedPrivacyStatusChecked = false
+                authenticatedPrivacyConfirmedVersion = null
+                if (latestCurrentRoute != Routes.PrivacyGate) {
+                    navController.navigate(Routes.PrivacyGate) {
+                        latestCurrentRoute?.let { route ->
+                            popUpTo(route) { inclusive = true }
+                        }
+                        launchSingleTop = true
+                    }
+                }
+            }
         }
     }
 
@@ -374,10 +393,7 @@ fun RehabianexNavHost(
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             DataControlScreen(
                 uiState = uiState,
-                fileManager = dataExportFileManager,
                 onRetry = viewModel::load,
-                onExport = viewModel::exportData,
-                onExportHandled = viewModel::markExportHandled,
                 onNavigate = navController::navigateSingleTop,
                 onBack = {
                     if (!navController.popBackStack()) {
@@ -387,7 +403,7 @@ fun RehabianexNavHost(
                 onRequestAccountDeletion = viewModel::requestAccountDeletion,
                 onClearDeletionError = viewModel::clearDeletionError,
                 onDeletionCompleted = { requestId ->
-                    authInfoMessage = "Solicitud de eliminación registrada. Folio: $requestId"
+                    authInfoMessage = "Cuenta desactivada. Folio de seguimiento: $requestId"
                     navController.returnToLogin()
                 },
             )

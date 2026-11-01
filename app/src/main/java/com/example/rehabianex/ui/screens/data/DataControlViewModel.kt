@@ -16,16 +16,8 @@ data class DataControlUiState(
     val loading: Boolean = true,
     val summary: DataControlSummary? = null,
     val errorMessage: String? = null,
-    val exportState: DataExportUiState = DataExportUiState.Idle,
     val deletionState: AccountDeletionUiState = AccountDeletionUiState.Idle,
 )
-
-sealed interface DataExportUiState {
-    data object Idle : DataExportUiState
-    data object Loading : DataExportUiState
-    data class Ready(val json: String) : DataExportUiState
-    data class Error(val message: String) : DataExportUiState
-}
 
 sealed interface AccountDeletionUiState {
     data object Idle : AccountDeletionUiState
@@ -66,27 +58,6 @@ class DataControlViewModel(
         }
     }
 
-    fun exportData() {
-        if (_uiState.value.exportState is DataExportUiState.Loading) return
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(exportState = DataExportUiState.Loading)
-            _uiState.value = when (val result = repository.exportOwnData()) {
-                is DataControlResult.Success -> _uiState.value.copy(
-                    exportState = DataExportUiState.Ready(result.data),
-                )
-                is DataControlResult.Failure -> _uiState.value.copy(
-                    exportState = DataExportUiState.Error(result.message),
-                )
-            }
-        }
-    }
-
-    fun markExportHandled(errorMessage: String? = null) {
-        _uiState.value = _uiState.value.copy(
-            exportState = errorMessage?.let(DataExportUiState::Error) ?: DataExportUiState.Idle,
-        )
-    }
-
     fun requestAccountDeletion(
         password: String,
         confirmation: String,
@@ -100,7 +71,7 @@ class DataControlViewModel(
         if (!summary.automatedAccountDeletion) {
             _uiState.value = state.copy(
                 deletionState = AccountDeletionUiState.Error(
-                    "Este tipo de cuenta requiere atención manual para solicitar eliminación.",
+                    "Este tipo de cuenta requiere atención manual para desactivación y eliminación.",
                 ),
             )
             return
@@ -108,7 +79,7 @@ class DataControlViewModel(
         if (confirmation != summary.confirmationPhrase || !acknowledgeRetentionLimits) {
             _uiState.value = state.copy(
                 deletionState = AccountDeletionUiState.Error(
-                    "Confirma la frase exacta y los límites de conservación.",
+                    "Confirma la frase exacta y que comprendes la desactivación y los límites de conservación.",
                 ),
             )
             return

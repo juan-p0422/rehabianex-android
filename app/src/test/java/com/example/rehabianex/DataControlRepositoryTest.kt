@@ -7,17 +7,18 @@ import com.example.rehabianex.data.model.AccountDeletionStatusDto
 import com.example.rehabianex.data.model.AuthData
 import com.example.rehabianex.data.model.AuthResponse
 import com.example.rehabianex.data.model.DataControlAccountDeletionDto
+import com.example.rehabianex.data.model.DataControlActionsDto
 import com.example.rehabianex.data.model.DataControlCategoryDto
 import com.example.rehabianex.data.model.DataControlProfileRectificationDto
 import com.example.rehabianex.data.model.DataControlRectificationDto
 import com.example.rehabianex.data.model.DataControlSummaryResponse
+import com.example.rehabianex.data.model.PermanentDeletionActionDto
 import com.example.rehabianex.data.model.TokenData
 import com.example.rehabianex.data.remote.ApiService
 import com.example.rehabianex.data.repository.DataControlRepository
 import com.example.rehabianex.data.repository.DataControlResult
 import java.lang.reflect.Proxy
 import kotlinx.coroutines.test.runTest
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -38,7 +39,6 @@ class DataControlRepositoryTest {
                             code = "patient_notes",
                             label = "Registros autorreportados",
                             location = "firestore_and_encrypted_room",
-                            exported = true,
                             deletionMode = "record_or_account_request",
                         ),
                     ),
@@ -50,7 +50,15 @@ class DataControlRepositoryTest {
                     ),
                     accountDeletion = DataControlAccountDeletionDto(
                         automated = true,
-                        confirmationPhrase = "ELIMINAR MI CUENTA",
+                        confirmationPhrase = "DESACTIVAR MI CUENTA",
+                    ),
+                    actions = DataControlActionsDto(
+                        requestPermanentDeletion = PermanentDeletionActionDto(
+                            address = "rehabianex@gmail.com",
+                            subject = "Solicitud de eliminación de cuenta RehabiAnex",
+                            automaticSubmission = false,
+                            identityVerificationRequired = true,
+                        ),
                     ),
                 ),
             )
@@ -61,30 +69,15 @@ class DataControlRepositoryTest {
         assertEquals("patient_notes", result.data.categories.single().code)
         assertTrue(result.data.rectificationRequiresConnection)
         assertTrue(result.data.automatedAccountDeletion)
-    }
-
-    @Test
-    fun exportAcceptsOnlyStructuredHolderPayload() = runTest {
-        val validJson = """{
-            "scope":"authenticated_account_holder",
-            "sensitivity_notice":"Contiene datos sensibles",
-            "identity":{"uid":"synthetic-patient"},
-            "profile":{},
-            "records":{}
-        }""".trimIndent()
-        val repository = repository { method, _ ->
-            require(method == "exportOwnData")
-            Response.success(validJson.toResponseBody(JSON_MEDIA_TYPE))
-        }
-
-        val rawResult = repository.exportOwnData()
-        assertTrue(
-            (rawResult as? DataControlResult.Failure)?.message ?: "resultado esperado",
-            rawResult is DataControlResult.Success,
+        assertEquals(
+            "Algunas solicitudes requieren atención manual al 33 2535 6657.",
+            result.data.manualRequestNotice,
         )
-        val result = rawResult as DataControlResult.Success
-
-        assertEquals(validJson, result.data)
+        assertEquals("rehabianex@gmail.com", result.data.permanentDeletionEmail)
+        assertEquals(
+            "Solicitud de eliminación de cuenta RehabiAnex",
+            result.data.permanentDeletionSubject,
+        )
     }
 
     @Test
@@ -111,11 +104,13 @@ class DataControlRepositoryTest {
     fun confirmedDeletionClearsLocalOwnerDataAndSessionOnlyAfterServerBlock() = runTest {
         val session = RecordingSessionManager()
         var clearedOwner: Pair<String?, String?>? = null
+        var fcmSuspended = false
         val repository = repository(
             session = session,
             clearLocal = { uid, role -> clearedOwner = uid to role },
+            suspendFcm = { fcmSuspended = true },
         ) { method, _ ->
-            require(method == "requestAccountDeletion")
+            require(method == "requestAccountDeactivation")
             Response.success(
                 202,
                 AccountDeletionResponse(
@@ -124,19 +119,27 @@ class DataControlRepositoryTest {
                         requestId = "synthetic-request-1",
                         status = "pending_manual_review",
                         requestedAt = "2026-10-12T12:00:00Z",
+                        deactivatedAt = "2026-10-12T12:00:00Z",
                     ),
                     syncBlocked = true,
                     localCleanupRequired = true,
+                    cleanupStatus = mapOf(
+                        "remote_access" to "blocked",
+                        "identity" to "completed",
+                        "fcm" to "completed",
+                        "relationships" to "completed",
+                    ),
                     manualAttentionRequired = true,
                     retentionNotice = "Revisión operativa pendiente.",
                 ),
             )
         }
 
-        val result = repository.requestAccountDeletion("ELIMINAR MI CUENTA", true)
+        val result = repository.requestAccountDeletion("DESACTIVAR MI CUENTA", true)
 
         assertTrue(result is DataControlResult.Success)
         assertEquals("synthetic-patient" to "patient", clearedOwner)
+        assertTrue(fcmSuspended)
         assertTrue(session.cleared)
     }
 
@@ -144,11 +147,13 @@ class DataControlRepositoryTest {
     fun incompleteDeletionResponsePreservesLocalSession() = runTest {
         val session = RecordingSessionManager()
         var localCleanupCalled = false
+        var fcmSuspended = false
         val repository = repository(
             session = session,
             clearLocal = { _, _ -> localCleanupCalled = true },
+            suspendFcm = { fcmSuspended = true },
         ) { method, _ ->
-            require(method == "requestAccountDeletion")
+            require(method == "requestAccountDeactivation")
             Response.success(
                 202,
                 AccountDeletionResponse(
@@ -159,16 +164,81 @@ class DataControlRepositoryTest {
             )
         }
 
-        val result = repository.requestAccountDeletion("ELIMINAR MI CUENTA", true)
+        val result = repository.requestAccountDeletion("DESACTIVAR MI CUENTA", true)
 
         assertTrue(result is DataControlResult.Failure)
         assertFalse(localCleanupCalled)
+        assertFalse(fcmSuspended)
+        assertFalse(session.cleared)
+    }
+
+    @Test
+    fun unauthorizedDeactivationDoesNotRefreshOrRetryDestructiveMutation() = runTest {
+        val session = RecordingSessionManager()
+        var deactivationCalls = 0
+        var unexpectedMethod: String? = null
+        val repository = repository(session = session) { method, _ ->
+            if (method == "requestAccountDeactivation") {
+                deactivationCalls++
+                Response.error<AccountDeletionResponse>(401, "{}".toResponseBody())
+            } else {
+                unexpectedMethod = method
+                error("Unexpected API method: $method")
+            }
+        }
+
+        val result = repository.requestAccountDeletion("DESACTIVAR MI CUENTA", true)
+
+        assertTrue(result is DataControlResult.Failure)
+        assertEquals(1, deactivationCalls)
+        assertEquals(null, unexpectedMethod)
+        assertFalse(session.cleared)
+    }
+
+    @Test
+    fun confirmedDeactivationForPreviousOwnerNeverClearsNewActiveSession() = runTest {
+        val session = RecordingSessionManager()
+        var localCleanupCalled = false
+        var fcmSuspended = false
+        val repository = repository(
+            session = session,
+            clearLocal = { _, _ -> localCleanupCalled = true },
+            suspendFcm = { fcmSuspended = true },
+        ) { method, _ ->
+            require(method == "requestAccountDeactivation")
+            session.replaceWith(uid = "new-owner", email = "new-owner@example.invalid")
+            Response.success(
+                202,
+                AccountDeletionResponse(
+                    request = AccountDeletionStatusDto(
+                        requestId = "synthetic-request-owner-switch",
+                        status = "pending_manual_review",
+                        requestedAt = "2026-10-28T12:00:00Z",
+                        deactivatedAt = "2026-10-28T12:00:00Z",
+                    ),
+                    syncBlocked = true,
+                    localCleanupRequired = true,
+                    cleanupStatus = mapOf("remote_access" to "blocked"),
+                    manualAttentionRequired = false,
+                    retentionNotice = "Revisión operativa pendiente.",
+                ),
+            )
+        }
+
+        val result = repository.requestAccountDeletion("DESACTIVAR MI CUENTA", true)
+
+        assertTrue(result is DataControlResult.Failure)
+        assertEquals(409, (result as DataControlResult.Failure).statusCode)
+        assertFalse(localCleanupCalled)
+        assertFalse(fcmSuspended)
+        assertEquals("new-owner", session.getUid())
         assertFalse(session.cleared)
     }
 
     private fun repository(
         session: RecordingSessionManager = RecordingSessionManager(),
         clearLocal: suspend (String?, String?) -> Unit = { _, _ -> },
+        suspendFcm: suspend () -> Unit = {},
         response: (String, List<Any?>) -> Any,
     ) = DataControlRepository(
         apiService = Proxy.newProxyInstance(
@@ -177,6 +247,7 @@ class DataControlRepositoryTest {
         ) { _, method, arguments -> response(method.name, arguments?.toList().orEmpty()) } as ApiService,
         sessionManager = session,
         clearLocalUserData = clearLocal,
+        suspendFcmForCurrentAccount = suspendFcm,
     )
 
     private class RecordingSessionManager : SessionManager {
@@ -191,6 +262,10 @@ class DataControlRepositoryTest {
         var savedSessions = 0
         var cleared = false
 
+        fun replaceWith(uid: String, email: String) {
+            session = session.copy(uid = uid, email = email)
+        }
+
         override fun saveSession(session: UserSession) {
             this.session = session
             savedSessions++
@@ -204,9 +279,5 @@ class DataControlRepositoryTest {
         override fun clear() {
             cleared = true
         }
-    }
-
-    private companion object {
-        val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }

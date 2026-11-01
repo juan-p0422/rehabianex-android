@@ -52,7 +52,6 @@ import com.example.rehabianex.data.model.UpdateSupervisorRequest
 import com.example.rehabianex.data.model.UpdateSupportContactRequest
 import com.example.rehabianex.data.model.UnlinkSupervisionResponse
 import retrofit2.Response
-import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -92,11 +91,8 @@ interface ApiService {
     @GET("data-control/summary")
     suspend fun dataControlSummary(): Response<DataControlSummaryResponse>
 
-    @GET("data-control/export")
-    suspend fun exportOwnData(): Response<ResponseBody>
-
-    @POST("data-control/account-deletion-requests")
-    suspend fun requestAccountDeletion(
+    @POST("data-control/account-deactivation-requests")
+    suspend fun requestAccountDeactivation(
         @Body request: AccountDeletionRequest,
     ): Response<AccountDeletionResponse>
 

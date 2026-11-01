@@ -64,7 +64,6 @@ class MainActivity : ComponentActivity() {
                         authRepository = container.authRepository,
                         privacyNoticeRepository = container.privacyNoticeRepository,
                         dataControlRepository = container.dataControlRepository,
-                        dataExportFileManager = container.dataExportFileManager,
                         patientRepository = container.patientRepository,
                         supervisorRepository = container.supervisorRepository,
                         fcmDemoRepository = container.fcmDemoRepository,

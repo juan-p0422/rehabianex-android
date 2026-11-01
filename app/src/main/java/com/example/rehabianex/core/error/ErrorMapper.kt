@@ -45,6 +45,7 @@ object ErrorMapper {
             404 -> "No se encontró la información solicitada."
             409 -> "La operación entra en conflicto con el estado actual. Actualiza la información e inténtalo nuevamente."
             422 -> "Revisa los datos marcados e inténtalo nuevamente."
+            428 -> "Debes confirmar la lectura del Aviso de Privacidad vigente para continuar."
             429 -> "Has realizado demasiadas solicitudes. Espera un momento antes de continuar."
             502 -> "Un servicio externo no está disponible temporalmente. Inténtalo nuevamente."
             in 500..599 -> "El servicio presenta un problema temporal. Inténtalo más tarde."
@@ -87,7 +88,7 @@ object ErrorMapper {
     }
 
     private const val MAX_MESSAGE_LENGTH = 180
-    private val BACKEND_MESSAGE_CODES = setOf(400, 403, 404, 409, 422, 429)
+    private val BACKEND_MESSAGE_CODES = setOf(400, 403, 404, 409, 422, 428, 429)
     private val TECHNICAL_MARKERS = setOf(
         "exception",
         "stack trace",

@@ -14,7 +14,6 @@ import com.example.rehabianex.data.model.DataControlSummaryResponse
 import com.example.rehabianex.data.model.LoginRequest
 import com.example.rehabianex.data.remote.ApiErrorParser
 import com.example.rehabianex.data.remote.ApiService
-import com.google.gson.JsonParser
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -34,6 +33,7 @@ class DataControlRepository(
     private val apiService: ApiService,
     private val sessionManager: SessionManager,
     private val clearLocalUserData: suspend (uid: String?, role: String?) -> Unit,
+    private val suspendFcmForCurrentAccount: suspend () -> Unit = {},
     private val sessionRefreshCoordinator: SessionRefreshCoordinator =
         SessionRefreshCoordinator(apiService, sessionManager),
 ) {
@@ -42,30 +42,6 @@ class DataControlRepository(
         if (!response.isSuccessful) throw DataControlFailure(response.toFailure())
         response.body()?.toSummary()
             ?: throw DataControlFailure(DataControlResult.Failure("El servidor no devolvió el inventario de datos."))
-    }
-
-    suspend fun exportOwnData(): DataControlResult<String> = safeRequest {
-        val response = authorizedCall(apiService::exportOwnData)
-        if (!response.isSuccessful) throw DataControlFailure(response.toFailure())
-        val body = response.body()
-            ?: throw DataControlFailure(DataControlResult.Failure("La exportación llegó vacía."))
-        val contentLength = body.contentLength()
-        if (contentLength > MAX_EXPORT_BYTES) {
-            body.close()
-            throw DataControlFailure(DataControlResult.Failure("La exportación supera el tamaño permitido en el dispositivo."))
-        }
-        val json = body.use {
-            val source = it.source()
-            source.request(MAX_EXPORT_BYTES.toLong() + 1L)
-            if (source.buffer.size > MAX_EXPORT_BYTES) {
-                throw DataControlFailure(DataControlResult.Failure("La exportación supera el tamaño permitido en el dispositivo."))
-            }
-            source.buffer.readUtf8()
-        }
-        if (!isStructuredExport(json)) {
-            throw DataControlFailure(DataControlResult.Failure("El servidor devolvió una exportación no válida."))
-        }
-        json
     }
 
     suspend fun reauthenticate(password: String): DataControlResult<Unit> = safeRequest {
@@ -139,15 +115,13 @@ class DataControlRepository(
     ): DataControlResult<AccountDeletionReceipt> = safeRequest {
         val uid = sessionManager.getUid()
         val role = sessionManager.getRole()
-        val response = authorizedCall {
-            apiService.requestAccountDeletion(
-                AccountDeletionRequest(
-                    confirmation = confirmation,
-                    acknowledgeRetentionLimits = acknowledgeRetentionLimits,
-                ),
-            )
-        }
-        if (!response.isSuccessful) throw DataControlFailure(response.toFailure())
+        val response = apiService.requestAccountDeactivation(
+            AccountDeletionRequest(
+                confirmation = confirmation,
+                acknowledgeRetentionLimits = acknowledgeRetentionLimits,
+            ),
+        )
+        if (response.code() != 202) throw DataControlFailure(response.toFailure())
         val body = response.body()
             ?: throw DataControlFailure(DataControlResult.Failure("El servidor no confirmó la solicitud."))
         val request = body.request
@@ -157,16 +131,46 @@ class DataControlRepository(
         if (body.syncBlocked != true || body.localCleanupRequired != true) {
             throw DataControlFailure(DataControlResult.Failure("El servidor no confirmó el bloqueo de sincronización."))
         }
+        val cleanupStatus = body.cleanupStatus.orEmpty()
+            .mapNotNull { (key, value) ->
+                val safeKey = key.cleanText(80) ?: return@mapNotNull null
+                val safeValue = value.cleanText(80) ?: return@mapNotNull null
+                safeKey to safeValue
+            }
+            .toMap()
+        if (cleanupStatus["remote_access"] != "blocked") {
+            throw DataControlFailure(DataControlResult.Failure("El servidor no confirmó el bloqueo de acceso remoto."))
+        }
+        val manualAttentionRequired = body.manualAttentionRequired
+            ?: throw DataControlFailure(DataControlResult.Failure("El servidor devolvió un resultado incompleto."))
+        val requestedAt = request.requestedAt.cleanText(80)
+            ?: throw DataControlFailure(DataControlResult.Failure("El servidor no confirmó la fecha de solicitud."))
+        val deactivatedAt = request.deactivatedAt.cleanText(80)
+            ?: throw DataControlFailure(DataControlResult.Failure("El servidor no confirmó la fecha de desactivación."))
+        val retentionNotice = body.retentionNotice.cleanText(600)
+            ?: throw DataControlFailure(DataControlResult.Failure("El servidor no informó los límites de conservación."))
         val receipt = AccountDeletionReceipt(
             requestId = requestId,
-            status = request.status.cleanText(60) ?: "pending_manual_review",
-            requestedAt = request.requestedAt.cleanText(80),
-            manualAttentionRequired = body.manualAttentionRequired == true,
-            retentionNotice = body.retentionNotice.cleanText(600)
-                ?: "La eliminación definitiva requiere revisión operativa.",
+            status = request.status.cleanText(60)
+                ?: throw DataControlFailure(DataControlResult.Failure("El servidor no confirmó el estado de la solicitud.")),
+            requestedAt = requestedAt,
+            deactivatedAt = deactivatedAt,
+            manualAttentionRequired = manualAttentionRequired,
+            retentionNotice = retentionNotice,
+            cleanupStatus = cleanupStatus,
         )
 
+        if (sessionManager.getUid() != uid || sessionManager.getRole() != role) {
+            throw DataControlFailure(
+                DataControlResult.Failure(
+                    "La cuenta activa cambió durante la solicitud. La cuenta anterior puede haber quedado desactivada; la sesión actual se conservó.",
+                    409,
+                ),
+            )
+        }
+
         withContext(NonCancellable) {
+            runCatching { suspendFcmForCurrentAccount() }
             runCatching { clearLocalUserData(uid, role) }
             sessionManager.clear()
         }
@@ -207,8 +211,11 @@ class DataControlRepository(
     private fun Response<*>.toFailure(): DataControlResult.Failure {
         val parsed = ApiErrorParser.parse(errorBody(), code())
         val message = when (code()) {
-            401 -> "La sesión expiró o la eliminación requiere una autenticación reciente."
-            403 -> "Esta acción requiere atención manual para tu tipo de cuenta."
+            401 -> "La sesión expiró. Inicia sesión nuevamente antes de continuar."
+            403 -> "La desactivación requiere una autenticación reciente o atención manual."
+            409 -> "La cuenta ya está desactivada o tiene una solicitud incompatible en curso."
+            422 -> parsed.message?.takeIf(String::isNotBlank)
+                ?: "Revisa la confirmación antes de desactivar la cuenta."
             423 -> "La cuenta ya tiene una eliminación en curso."
             else -> ErrorMapper.safeBackendMessage(code(), parsed.message)
                 ?: ErrorMapper.fromHttpCode(code()).message
@@ -219,6 +226,8 @@ class DataControlRepository(
     private fun DataControlSummaryResponse.toSummary(): DataControlSummary {
         val safeRole = role?.takeIf { it in VALID_ROLES } ?: sessionManager.getRole().orEmpty()
         val profileRectification = rectification?.profile
+        val deactivation = accountDeactivation ?: accountDeletion
+        val permanentDeletion = actions?.requestPermanentDeletion
         return DataControlSummary(
             role = safeRole,
             deletionStatus = deletionStatus.cleanText(60) ?: "none",
@@ -228,7 +237,6 @@ class DataControlRepository(
                     code = code,
                     label = category.label.cleanText(120) ?: code,
                     location = category.location.cleanText(120) ?: "No disponible",
-                    exported = category.exported == true,
                     deletionMode = category.deletionMode.cleanText(120) ?: "manual_review",
                 )
             }.take(MAX_CATEGORIES),
@@ -237,25 +245,23 @@ class DataControlRepository(
                 .distinct()
                 .take(MAX_EDITABLE_FIELDS),
             rectificationRequiresConnection = profileRectification?.offlineQueueAllowed != true,
-            automatedAccountDeletion = accountDeletion?.automated == true,
-            recentAuthMaxAgeSeconds = accountDeletion?.recentAuthMaxAgeSeconds
+            automatedAccountDeletion = deactivation?.automated == true,
+            recentAuthMaxAgeSeconds = deactivation?.recentAuthMaxAgeSeconds
                 ?.coerceIn(60, 3_600)
                 ?: 300,
-            confirmationPhrase = accountDeletion?.confirmationPhrase.cleanText(80)
+            confirmationPhrase = deactivation?.confirmationPhrase.cleanText(80)
                 ?: DEFAULT_CONFIRMATION,
             retentionNotice = retentionNotice.cleanText(600)
                 ?: "La conservación aplicable requiere confirmación por soporte.",
             manualRequestNotice = manualRequestNotice.cleanText(400)
-                ?: "Algunas solicitudes requieren atención manual.",
+                ?: "Algunas solicitudes requieren atención manual al 33 2535 6657.",
+            permanentDeletionEmail = permanentDeletion?.address
+                ?.validEmailOrNull()
+                ?: DEFAULT_PERMANENT_DELETION_EMAIL,
+            permanentDeletionSubject = permanentDeletion?.subject.cleanText(120)
+                ?: DEFAULT_PERMANENT_DELETION_SUBJECT,
         )
     }
-
-    private fun isStructuredExport(json: String): Boolean = runCatching {
-        val root = JsonParser.parseString(json).asJsonObject
-        root.get("scope")?.asString == "authenticated_account_holder" &&
-            root.has("identity") && root.has("profile") && root.has("records") &&
-            root.get("sensitivity_notice")?.asString?.isNotBlank() == true
-    }.getOrDefault(false)
 
     private fun String?.safeCredential(maxLength: Int): String? = this
         ?.takeIf { it.isNotBlank() && it.length <= maxLength }
@@ -267,19 +273,26 @@ class DataControlRepository(
         ?.take(maxLength)
         ?.takeIf(String::isNotBlank)
 
+    private fun String?.validEmailOrNull(): String? = this
+        ?.trim()
+        ?.takeIf { it.length in 3..254 }
+        ?.takeIf { it.count { char -> char == '@' } == 1 }
+        ?.takeIf { it.none(Char::isWhitespace) && it.none(Char::isISOControl) }
+
     private class DataControlFailure(
         val result: DataControlResult.Failure,
     ) : IOException(result.message)
 
     private companion object {
-        const val MAX_EXPORT_BYTES = 5 * 1024 * 1024
         const val MAX_TOKEN_LENGTH = 16_384
         const val MAX_UID_LENGTH = 128
         const val MAX_PASSWORD_LENGTH = 4_096
         const val MAX_REQUEST_ID_LENGTH = 180
         const val MAX_CATEGORIES = 20
         const val MAX_EDITABLE_FIELDS = 40
-        const val DEFAULT_CONFIRMATION = "ELIMINAR MI CUENTA"
+        const val DEFAULT_CONFIRMATION = "DESACTIVAR MI CUENTA"
+        const val DEFAULT_PERMANENT_DELETION_EMAIL = "rehabianex@gmail.com"
+        const val DEFAULT_PERMANENT_DELETION_SUBJECT = "Solicitud de eliminación de cuenta RehabiAnex"
         val VALID_ROLES = setOf("patient", "supervisor", "admin")
     }
 }

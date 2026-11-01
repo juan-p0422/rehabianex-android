@@ -1,6 +1,8 @@
 package com.example.rehabianex.ui.screens.data
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,10 +14,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -26,7 +26,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.rehabianex.data.export.DataExportFileManager
 import com.example.rehabianex.data.model.DataControlCategory
 import com.example.rehabianex.navigation.Routes
 import com.example.rehabianex.ui.components.InputField
@@ -43,40 +42,21 @@ import com.example.rehabianex.ui.theme.RehabianexColors
 @Composable
 fun DataControlScreen(
     uiState: DataControlUiState,
-    fileManager: DataExportFileManager,
     onRetry: () -> Unit,
-    onExport: () -> Unit,
-    onExportHandled: (String?) -> Unit,
     onNavigate: (String) -> Unit,
     onBack: () -> Unit,
     onRequestAccountDeletion: (String, String, Boolean) -> Unit,
     onClearDeletionError: () -> Unit,
     onDeletionCompleted: (String) -> Unit,
 ) {
-    val context = LocalContext.current
     val summary = uiState.summary
     var showDeletionDialog by rememberSaveable { mutableStateOf(false) }
-
-    val exportReady = uiState.exportState as? DataExportUiState.Ready
-    LaunchedEffect(exportReady?.json) {
-        val json = exportReady?.json ?: return@LaunchedEffect
-        runCatching {
-            val sendIntent = fileManager.createPrivateExport(json)
-            context.startActivity(
-                Intent.createChooser(sendIntent, "Compartir exportación sensible"),
-            )
-        }.onSuccess {
-            onExportHandled(null)
-        }.onFailure {
-            onExportHandled("No fue posible abrir una aplicación segura para compartir el archivo.")
-        }
-    }
 
     ScreenScaffold {
         Column {
             ScreenHeader(
                 title = "Control de datos",
-                subtitle = "Consulta, exportación, rectificación y solicitudes de eliminación",
+                subtitle = "Consulta, rectificación y solicitudes de eliminación",
             )
             Spacer(Modifier.height(12.dp))
             RehabianexOutlineButton("Volver", onClick = onBack)
@@ -96,11 +76,6 @@ fun DataControlScreen(
                 else -> {
                     DataInventory(summary.categories)
                     Spacer(Modifier.height(12.dp))
-                    ExportSection(
-                        exportState = uiState.exportState,
-                        onExport = onExport,
-                    )
-                    Spacer(Modifier.height(12.dp))
                     RectificationSection(
                         role = summary.role,
                         editableFields = summary.editableFields,
@@ -115,6 +90,11 @@ fun DataControlScreen(
                         retentionNotice = summary.retentionNotice,
                         manualNotice = summary.manualRequestNotice,
                         onRequest = { showDeletionDialog = true },
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    DefinitiveDeletionSection(
+                        email = summary.permanentDeletionEmail,
+                        subject = summary.permanentDeletionSubject,
                     )
                 }
             }
@@ -136,11 +116,11 @@ fun DataControlScreen(
     (uiState.deletionState as? AccountDeletionUiState.Success)?.let { success ->
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Solicitud registrada") },
+            title = { Text("Cuenta desactivada") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Folio: ${success.receipt.requestId}", fontWeight = FontWeight.Bold)
-                    Text("La cuenta y las nuevas sincronizaciones quedaron bloqueadas.")
+                    Text("El servidor confirmó el bloqueo de acceso y de nuevas sincronizaciones.")
                     Text(success.receipt.retentionNotice)
                     if (success.receipt.manualAttentionRequired) {
                         Text("La solicitud requiere seguimiento manual.")
@@ -149,7 +129,7 @@ fun DataControlScreen(
             },
             confirmButton = {
                 TextButton(onClick = { onDeletionCompleted(success.receipt.requestId) }) {
-                    Text("Entendido y cerrar sesión")
+                    Text("Entendido")
                 }
             },
         )
@@ -168,7 +148,7 @@ private fun DataInventory(categories: List<DataControlCategory>) {
                 Text(category.label, fontWeight = FontWeight.Bold)
                 Text(
                     "Ubicación: ${category.location.locationLabel()} · " +
-                        if (category.exported) "Incluido en exportación" else "No incluido por retención operativa",
+                        "Tratamiento: ${category.deletionMode.deletionModeLabel()}",
                     color = RehabianexColors.GrayText,
                 )
                 Spacer(Modifier.height(6.dp))
@@ -178,31 +158,6 @@ private fun DataInventory(categories: List<DataControlCategory>) {
             "La caché local es distinta de los datos remotos. Limpiarla no elimina la cuenta ni la información del servidor.",
             color = RehabianexColors.GrayText,
         )
-    }
-}
-
-@Composable
-private fun ExportSection(
-    exportState: DataExportUiState,
-    onExport: () -> Unit,
-) {
-    RehabianexCard {
-        Text("Exportar una copia", fontWeight = FontWeight.Bold)
-        Text("Se generará un JSON estructurado con información del titular autenticado.")
-        Text(
-            "El archivo puede contener datos sensibles. Se guarda temporalmente en el espacio privado de la app y tú eliges con qué aplicación compartirlo.",
-            color = RehabianexColors.GrayText,
-        )
-        Spacer(Modifier.height(8.dp))
-        RehabianexButton(
-            text = if (exportState is DataExportUiState.Loading) "Preparando exportación..." else "Generar exportación",
-            enabled = exportState !is DataExportUiState.Loading,
-            onClick = onExport,
-        )
-        (exportState as? DataExportUiState.Error)?.let {
-            Spacer(Modifier.height(6.dp))
-            Text(it.message, color = RehabianexColors.Red)
-        }
     }
 }
 
@@ -260,16 +215,67 @@ private fun AccountDeletionSection(
     onRequest: () -> Unit,
 ) {
     WarningCard {
-        Text("Solicitar eliminación de cuenta", fontWeight = FontWeight.Bold)
+        Text("Desactivar mi cuenta y solicitar eliminación", fontWeight = FontWeight.Bold)
         Text(
-            "La solicitud bloquea inmediatamente el acceso y nuevas sincronizaciones. No equivale a una purga física instantánea.",
+            "Perderás el acceso normal a la cuenta. Tras la confirmación del servidor se bloquearán nuevas sincronizaciones y se limpiarán los datos locales asociados a esta sesión.",
+        )
+        Text(
+            "Esta opción realiza una desactivación y borrado suave; no equivale a una eliminación física inmediata de respaldos, logs o proveedores.",
+            color = RehabianexColors.GrayText,
         )
         Text(retentionNotice, color = RehabianexColors.GrayText)
         Spacer(Modifier.height(8.dp))
         if (automated) {
-            RehabianexDangerButton("Iniciar solicitud", onClick = onRequest)
+            RehabianexDangerButton("Desactivar mi cuenta", onClick = onRequest)
         } else {
             Text(manualNotice)
+        }
+    }
+}
+
+@Composable
+private fun DefinitiveDeletionSection(
+    email: String,
+    subject: String,
+) {
+    val context = LocalContext.current
+    var launchError by rememberSaveable { mutableStateOf(false) }
+
+    SoftCard {
+        Text("Solicitar eliminación definitiva", fontWeight = FontWeight.Bold)
+        Text("Esta solicitud se atiende por correo y requiere verificación de identidad por el responsable.")
+        Text("1. Escribe a $email.")
+        Text("2. Usa el asunto: “$subject”.")
+        Text("3. Indica el correo asociado a la cuenta y que solicitas su eliminación definitiva.")
+        Text("4. Sigue la verificación de identidad que te indique el responsable.")
+        Text("5. Espera la confirmación de que el procedimiento terminó.")
+        Text(
+            "No envíes contraseñas, tokens, notas emocionales, historial de consumo ni datos de terceras personas. Abrir el correo no significa que la solicitud haya sido enviada.",
+            color = RehabianexColors.GrayText,
+        )
+        Spacer(Modifier.height(8.dp))
+        RehabianexOutlineButton("Abrir aplicación de correo") {
+            launchError = false
+            val intent = Intent(
+                Intent.ACTION_SENDTO,
+                Uri.fromParts("mailto", email, null),
+            ).apply {
+                putExtra(Intent.EXTRA_SUBJECT, subject)
+            }
+            try {
+                context.startActivity(intent)
+            } catch (_: ActivityNotFoundException) {
+                launchError = true
+            } catch (_: SecurityException) {
+                launchError = true
+            }
+        }
+        if (launchError) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "No se encontró una aplicación de correo. Escribe manualmente a $email.",
+                color = RehabianexColors.Red,
+            )
         }
     }
 }
@@ -290,10 +296,10 @@ private fun AccountDeletionDialog(
     AlertDialog(
         onDismissRequest = { if (!loading) onDismiss() },
         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-        title = { Text("Confirmación reforzada") },
+        title = { Text("Desactivar mi cuenta y solicitar eliminación") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Primero confirmaremos nuevamente tu identidad con Firebase.")
+                Text("Perderás el acceso normal. Primero confirmaremos nuevamente tu identidad.")
                 InputField(
                     value = password,
                     onValueChange = { if (!loading) password = it.take(4_096) },
@@ -317,11 +323,11 @@ private fun AccountDeletionDialog(
                         enabled = !loading,
                         onCheckedChange = { acknowledged = it },
                     )
-                    Text("Comprendo que pueden existir límites de conservación y revisión manual.")
+                    Text("Comprendo que esta acción desactiva la cuenta y que la eliminación definitiva puede requerir revisión manual.")
                 }
                 when (state) {
                     AccountDeletionUiState.Reauthenticating -> Text("Confirmando identidad...")
-                    AccountDeletionUiState.Requesting -> Text("Bloqueando cuenta y sincronizaciones...")
+                    AccountDeletionUiState.Requesting -> Text("Desactivando cuenta y bloqueando sincronizaciones...")
                     is AccountDeletionUiState.Error -> Text(state.message, color = RehabianexColors.Red)
                     else -> Unit
                 }
@@ -333,7 +339,7 @@ private fun AccountDeletionDialog(
                     confirmation == confirmationPhrase && acknowledged,
                 onClick = { onConfirm(password, confirmation, acknowledged) },
             ) {
-                Text("Solicitar eliminación")
+                Text("Desactivar cuenta")
             }
         },
         dismissButton = {
@@ -362,4 +368,11 @@ private fun String.locationLabel(): String = when (this) {
     "firestore_and_encrypted_room" -> "Firestore y Room cifrado"
     "backend_and_providers" -> "Backend y proveedores"
     else -> this.replace('_', ' ')
+}
+
+private fun String.deletionModeLabel(): String = when (this) {
+    "record_or_account_request" -> "eliminación del registro o solicitud de cuenta"
+    "account_request" -> "solicitud de eliminación de cuenta"
+    "manual_review" -> "revisión manual"
+    else -> "según el control disponible"
 }

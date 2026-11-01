@@ -6,7 +6,6 @@ import com.example.rehabianex.core.session.SessionManager
 import com.example.rehabianex.core.session.OfflineDataCleanupCoordinator
 import com.example.rehabianex.core.session.SessionRefreshCoordinator
 import com.example.rehabianex.data.local.PatientIdentityStore
-import com.example.rehabianex.data.export.DataExportFileManager
 import com.example.rehabianex.data.local.AndroidNetworkStatusProvider
 import com.example.rehabianex.data.local.SupervisorNotificationSettingsStore
 import com.example.rehabianex.data.local.SharedPreferencesPrivacyNoticeReadStore
@@ -40,7 +39,6 @@ class AppContainer(context: Context) {
     private val patientIdentityStore = PatientIdentityStore(context)
     private val supervisorNotificationSettingsStore = SupervisorNotificationSettingsStore(context)
     private val privacyNoticeReadStore = SharedPreferencesPrivacyNoticeReadStore(context)
-    val dataExportFileManager = DataExportFileManager(applicationContext)
     val privacyNoticeRepository = PrivacyNoticeRepository(
         apiService = apiService,
         sessionManager = sessionManager,
@@ -97,7 +95,9 @@ class AppContainer(context: Context) {
         clearLocalUserData = { uid, role ->
             offlineDataCleanupCoordinator.clearAfterConfirmedLogout(uid, role)
             adaptiveSupportManager.clearOwnerState(uid)
-            dataExportFileManager.clearExports()
+        },
+        suspendFcmForCurrentAccount = {
+            fcmTokenManager.revokeCurrentToken()
         },
         sessionRefreshCoordinator = sessionRefreshCoordinator,
     )
@@ -108,13 +108,11 @@ class AppContainer(context: Context) {
         clearLocalUserData = { uid, role ->
             offlineDataCleanupCoordinator.clearAfterConfirmedLogout(uid, role)
             adaptiveSupportManager.clearOwnerState(uid)
-            dataExportFileManager.clearExports()
         },
         pendingLocalNotesCount = offlineDataCleanupCoordinator::pendingPatientNotes,
         clearPreviousUserData = { uid, role ->
             offlineDataCleanupCoordinator.clearForUserSwitch(uid, role)
             adaptiveSupportManager.clearOwnerState(uid)
-            dataExportFileManager.clearExports()
         },
         restrictPrivatePatientIdentity = patientRepository::restrictPrivateIdentityFromLogin,
         registerFcmToken = {
