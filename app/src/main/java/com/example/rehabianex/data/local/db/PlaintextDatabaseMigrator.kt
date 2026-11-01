@@ -87,15 +87,23 @@ internal class PlaintextDatabaseMigrator(
             null,
         )
         try {
-            database.rawExecSQL("ATTACH DATABASE '$targetPath' AS encrypted KEY \"x'$keyHex'\"")
-            database.rawQuery(
-                "SELECT sqlcipher_export('encrypted')",
-                emptyArray<String>(),
-            ).use { cursor ->
-                while (cursor.moveToNext()) Unit
+            // A transaction pins ATTACH and sqlcipher_export to the same pooled
+            // connection. Without it, Android may execute the SELECT on a
+            // different connection where the attached schema does not exist.
+            database.beginTransaction()
+            try {
+                database.rawExecSQL("ATTACH DATABASE '$targetPath' AS encrypted KEY \"x'$keyHex'\"")
+                database.rawQuery(
+                    "SELECT sqlcipher_export('encrypted')",
+                    emptyArray<String>(),
+                ).use { cursor ->
+                    while (cursor.moveToNext()) Unit
+                }
+                database.rawExecSQL("PRAGMA encrypted.user_version = $version")
+                database.setTransactionSuccessful()
+            } finally {
+                database.endTransaction()
             }
-            database.rawExecSQL("PRAGMA encrypted.user_version = $version")
-            database.rawExecSQL("DETACH DATABASE encrypted")
         } finally {
             database.close()
         }

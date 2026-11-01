@@ -21,6 +21,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -117,6 +118,41 @@ class EncryptedRoomDatabaseInstrumentedTest {
             database!!.patientSummaryDao().get("legacy-patient")?.fullName,
         )
         assertEquals(1, database!!.patientNoteDao().pendingCount("legacy-patient"))
+    }
+
+    @Test
+    fun interruptedReplacementRestoresPlaintextBackupAndRetriesMigration() = runBlocking {
+        val databaseFile = context.getDatabasePath(TEST_DATABASE_NAME)
+        val plaintextDatabase = Room.databaseBuilder(
+            context,
+            RehabiAnexDatabase::class.java,
+            TEST_DATABASE_NAME,
+        ).build()
+        plaintextDatabase.patientSummaryDao().upsert(
+            PatientSummaryEntity(
+                ownerUid = "interrupted-patient",
+                fullName = "Copia recuperable",
+                sobrietyStartDate = null,
+                lastSyncedAt = 9L,
+            ),
+        )
+        plaintextDatabase.close()
+        val interruptedBackup = java.io.File(databaseFile.path + ".plaintext-backup")
+        assertTrue(databaseFile.renameTo(interruptedBackup))
+
+        database = RehabiAnexDatabase.buildEncryptedDatabaseForTest(
+            context,
+            TEST_DATABASE_NAME,
+        )
+
+        assertEquals(
+            "Copia recuperable",
+            database!!.patientSummaryDao().get("interrupted-patient")?.fullName,
+        )
+        assertFalse(interruptedBackup.exists())
+        val encryptedHeader = ByteArray(SQLITE_HEADER.size)
+        FileInputStream(databaseFile).use { it.read(encryptedHeader) }
+        assertFalse(encryptedHeader.contentEquals(SQLITE_HEADER))
     }
 
     @Test
