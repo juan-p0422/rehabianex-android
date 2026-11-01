@@ -5,6 +5,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.example.rehabianex.data.local.PatientIdentityStore
 import com.example.rehabianex.data.local.SupervisorNotificationSettingsStore
 import com.example.rehabianex.data.local.PrivacyNoticeReadStore
+import com.example.rehabianex.data.local.PendingDeactivationCleanupStore
 import com.example.rehabianex.data.local.db.RehabiAnexDatabase
 import com.example.rehabianex.notifications.AgendaNotificationHelper
 import com.example.rehabianex.notifications.NotificationRescheduleWorker
@@ -25,6 +26,7 @@ class OfflineDataCleanupCoordinator(
     private val patientIdentityStore: PatientIdentityStore,
     private val supervisorNotificationSettingsStore: SupervisorNotificationSettingsStore,
     private val privacyNoticeReadStore: PrivacyNoticeReadStore,
+    private val pendingDeactivationCleanupStore: PendingDeactivationCleanupStore? = null,
     private val clearInMemoryState: () -> Unit = {},
 ) {
     private val applicationContext = context.applicationContext
@@ -42,6 +44,18 @@ class OfflineDataCleanupCoordinator(
         clearOwner(uid, role, deleteUnsyncedNotes = true)
     }
 
+    suspend fun clearAfterAccountDeactivation(uid: String, role: String) {
+        pendingDeactivationCleanupStore?.save(uid, role)
+        clearOwner(uid, role, deleteUnsyncedNotes = true)
+        pendingDeactivationCleanupStore?.clear()
+    }
+
+    suspend fun retryPendingAccountDeactivationCleanup() {
+        val pending = pendingDeactivationCleanupStore?.load() ?: return
+        clearOwner(pending.uid, pending.role, deleteUnsyncedNotes = true)
+        pendingDeactivationCleanupStore.clear()
+    }
+
     private suspend fun clearOwner(
         uid: String?,
         role: String?,
@@ -53,20 +67,18 @@ class OfflineDataCleanupCoordinator(
 
         if (!uid.isNullOrBlank()) {
             PatientSyncWorker.cancel(applicationContext, uid)
-            val eventIds = runCatching {
-                database.agendaEventDao().serverIdsForOwner(uid)
-            }.getOrDefault(emptyList())
+            val eventIds = database.agendaEventDao().serverIdsForOwner(uid)
             eventIds.filter(String::isNotBlank).forEach { eventId ->
                 AgendaNotificationHelper.cancelEventReminder(applicationContext, eventId)
             }
 
             clearSynchronizedRoomData(uid)
             if (deleteUnsyncedNotes) {
-                runCatching { database.patientNoteDao().clearUnsyncedForOwner(uid) }
+                database.patientNoteDao().clearUnsyncedForOwner(uid)
             }
-            runCatching { patientIdentityStore.clearOwner(uid) }
-            runCatching { supervisorNotificationSettingsStore.clearOwner(uid) }
-            runCatching { privacyNoticeReadStore.clearOwner(uid) }
+            patientIdentityStore.clearOwner(uid)
+            supervisorNotificationSettingsStore.clearOwner(uid)
+            privacyNoticeReadStore.clearOwner(uid)
         }
 
         NotificationManagerCompat.from(applicationContext).cancelAll()
@@ -74,17 +86,17 @@ class OfflineDataCleanupCoordinator(
     }
 
     private suspend fun clearSynchronizedRoomData(uid: String) {
-        runCatching { database.patientNoteDao().clearSyncedForOwner(uid) }
-        runCatching { database.agendaEventDao().clearOwner(uid) }
-        runCatching { database.supportContactDao().clearOwner(uid) }
-        runCatching { database.notificationSettingsDao().clearOwner(uid) }
-        runCatching { database.patientAchievementDao().clearOwner(uid) }
-        runCatching { database.cacheSyncStateDao().clearOwner(uid) }
-        runCatching { database.patientSummaryDao().clearOwner(uid) }
-        runCatching { database.patientProfileDao().clearOwner(uid) }
-        runCatching { database.supervisorProfileSnapshotDao().clearOwner(uid) }
-        runCatching { database.supervisorDashboardSummaryDao().clearOwner(uid) }
-        runCatching { database.adminProfileSnapshotDao().clearOwner(uid) }
-        runCatching { database.adminDashboardSummaryDao().clearOwner(uid) }
+        database.patientNoteDao().clearSyncedForOwner(uid)
+        database.agendaEventDao().clearOwner(uid)
+        database.supportContactDao().clearOwner(uid)
+        database.notificationSettingsDao().clearOwner(uid)
+        database.patientAchievementDao().clearOwner(uid)
+        database.cacheSyncStateDao().clearOwner(uid)
+        database.patientSummaryDao().clearOwner(uid)
+        database.patientProfileDao().clearOwner(uid)
+        database.supervisorProfileSnapshotDao().clearOwner(uid)
+        database.supervisorDashboardSummaryDao().clearOwner(uid)
+        database.adminProfileSnapshotDao().clearOwner(uid)
+        database.adminDashboardSummaryDao().clearOwner(uid)
     }
 }

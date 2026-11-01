@@ -105,10 +105,13 @@ class DataControlRepositoryTest {
         val session = RecordingSessionManager()
         var clearedOwner: Pair<String?, String?>? = null
         var fcmSuspended = false
+        val cleanupMarkers = mutableListOf<String>()
         val repository = repository(
             session = session,
             clearLocal = { uid, role -> clearedOwner = uid to role },
             suspendFcm = { fcmSuspended = true },
+            markCleanupPending = { uid, role -> cleanupMarkers += "$uid:$role" },
+            clearCleanupPending = { cleanupMarkers += "cleared" },
         ) { method, _ ->
             require(method == "requestAccountDeactivation")
             Response.success(
@@ -140,6 +143,43 @@ class DataControlRepositoryTest {
         assertTrue(result is DataControlResult.Success)
         assertEquals("synthetic-patient" to "patient", clearedOwner)
         assertTrue(fcmSuspended)
+        assertTrue(session.cleared)
+        assertEquals(listOf("synthetic-patient:patient", "cleared"), cleanupMarkers)
+    }
+
+    @Test
+    fun localCleanupFailureKeepsRetryMarkerAndClearsCredentials() = runTest {
+        val session = RecordingSessionManager()
+        val cleanupMarkers = mutableListOf<String>()
+        val repository = repository(
+            session = session,
+            clearLocal = { _, _ -> error("synthetic cleanup failure") },
+            markCleanupPending = { uid, role -> cleanupMarkers += "$uid:$role" },
+            clearCleanupPending = { cleanupMarkers += "cleared" },
+        ) { method, _ ->
+            require(method == "requestAccountDeactivation")
+            Response.success(
+                202,
+                AccountDeletionResponse(
+                    request = AccountDeletionStatusDto(
+                        requestId = "synthetic-request-retry",
+                        status = "pending_manual_review",
+                        requestedAt = "2026-11-01T12:00:00Z",
+                        deactivatedAt = "2026-11-01T12:00:00Z",
+                    ),
+                    syncBlocked = true,
+                    localCleanupRequired = true,
+                    cleanupStatus = mapOf("remote_access" to "blocked"),
+                    manualAttentionRequired = false,
+                    retentionNotice = "Revisión operativa pendiente.",
+                ),
+            )
+        }
+
+        val result = repository.requestAccountDeletion("DESACTIVAR MI CUENTA", true)
+
+        assertTrue(result is DataControlResult.Failure)
+        assertEquals(listOf("synthetic-patient:patient"), cleanupMarkers)
         assertTrue(session.cleared)
     }
 
@@ -239,6 +279,8 @@ class DataControlRepositoryTest {
         session: RecordingSessionManager = RecordingSessionManager(),
         clearLocal: suspend (String?, String?) -> Unit = { _, _ -> },
         suspendFcm: suspend () -> Unit = {},
+        markCleanupPending: (String, String) -> Unit = { _, _ -> },
+        clearCleanupPending: () -> Unit = {},
         response: (String, List<Any?>) -> Any,
     ) = DataControlRepository(
         apiService = Proxy.newProxyInstance(
@@ -248,6 +290,8 @@ class DataControlRepositoryTest {
         sessionManager = session,
         clearLocalUserData = clearLocal,
         suspendFcmForCurrentAccount = suspendFcm,
+        markLocalCleanupPending = markCleanupPending,
+        clearLocalCleanupPending = clearCleanupPending,
     )
 
     private class RecordingSessionManager : SessionManager {

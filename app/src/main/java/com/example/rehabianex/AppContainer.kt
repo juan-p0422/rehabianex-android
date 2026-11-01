@@ -9,6 +9,7 @@ import com.example.rehabianex.data.local.PatientIdentityStore
 import com.example.rehabianex.data.local.AndroidNetworkStatusProvider
 import com.example.rehabianex.data.local.SupervisorNotificationSettingsStore
 import com.example.rehabianex.data.local.SharedPreferencesPrivacyNoticeReadStore
+import com.example.rehabianex.data.local.PendingDeactivationCleanupStore
 import com.example.rehabianex.data.local.db.RehabiAnexDatabase
 import com.example.rehabianex.data.remote.ApiService
 import com.example.rehabianex.data.repository.AdminRepository
@@ -23,6 +24,10 @@ import com.example.rehabianex.sync.PatientSyncWorker
 import com.example.rehabianex.adaptive.AdaptiveSupportManager
 import com.example.rehabianex.notifications.FcmTokenManager
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class AppContainer(context: Context) {
     private val applicationContext = context.applicationContext
@@ -39,6 +44,7 @@ class AppContainer(context: Context) {
     private val patientIdentityStore = PatientIdentityStore(context)
     private val supervisorNotificationSettingsStore = SupervisorNotificationSettingsStore(context)
     private val privacyNoticeReadStore = SharedPreferencesPrivacyNoticeReadStore(context)
+    private val pendingDeactivationCleanupStore = PendingDeactivationCleanupStore(context)
     val privacyNoticeRepository = PrivacyNoticeRepository(
         apiService = apiService,
         sessionManager = sessionManager,
@@ -87,15 +93,31 @@ class AppContainer(context: Context) {
         supervisorNotificationSettingsStore = supervisorNotificationSettingsStore,
         clearInMemoryState = supervisorRepository::clearSessionMemory,
         privacyNoticeReadStore = privacyNoticeReadStore,
+        pendingDeactivationCleanupStore = pendingDeactivationCleanupStore,
     )
+
+    init {
+        pendingDeactivationCleanupStore.load()?.let { pending ->
+            PatientSyncWorker.cancel(applicationContext, pending.uid)
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                runCatching {
+                    offlineDataCleanupCoordinator.retryPendingAccountDeactivationCleanup()
+                }
+            }
+        }
+    }
 
     val dataControlRepository = DataControlRepository(
         apiService = apiService,
         sessionManager = sessionManager,
         clearLocalUserData = { uid, role ->
-            offlineDataCleanupCoordinator.clearAfterConfirmedLogout(uid, role)
+            requireNotNull(uid)
+            requireNotNull(role)
+            offlineDataCleanupCoordinator.clearAfterAccountDeactivation(uid, role)
             adaptiveSupportManager.clearOwnerState(uid)
         },
+        markLocalCleanupPending = pendingDeactivationCleanupStore::save,
+        clearLocalCleanupPending = pendingDeactivationCleanupStore::clear,
         suspendFcmForCurrentAccount = {
             fcmTokenManager.revokeCurrentToken()
         },

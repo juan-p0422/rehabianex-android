@@ -34,6 +34,8 @@ class DataControlRepository(
     private val sessionManager: SessionManager,
     private val clearLocalUserData: suspend (uid: String?, role: String?) -> Unit,
     private val suspendFcmForCurrentAccount: suspend () -> Unit = {},
+    private val markLocalCleanupPending: (uid: String, role: String) -> Unit = { _, _ -> },
+    private val clearLocalCleanupPending: () -> Unit = {},
     private val sessionRefreshCoordinator: SessionRefreshCoordinator =
         SessionRefreshCoordinator(apiService, sessionManager),
 ) {
@@ -170,9 +172,22 @@ class DataControlRepository(
         }
 
         withContext(NonCancellable) {
+            if (uid.isNullOrBlank() || role.isNullOrBlank()) {
+                sessionManager.clear()
+                throw DataControlFailure(
+                    DataControlResult.Failure(
+                        "La cuenta fue bloqueada, pero faltan datos locales para completar la limpieza. Reinicia la aplicación.",
+                    ),
+                )
+            }
+            markLocalCleanupPending(uid, role)
             runCatching { suspendFcmForCurrentAccount() }
-            runCatching { clearLocalUserData(uid, role) }
-            sessionManager.clear()
+            try {
+                clearLocalUserData(uid, role)
+                clearLocalCleanupPending()
+            } finally {
+                sessionManager.clear()
+            }
         }
         receipt
     }
