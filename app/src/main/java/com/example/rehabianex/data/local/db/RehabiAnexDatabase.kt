@@ -1,7 +1,6 @@
 package com.example.rehabianex.data.local.db
 
 import android.content.Context
-import com.example.rehabianex.BuildConfig
 import com.example.rehabianex.data.local.security.DatabasePassphraseProvider
 import androidx.room.Database
 import androidx.room.Room
@@ -9,7 +8,6 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import java.io.File
 import java.io.FileInputStream
 import net.zetetic.database.Logger
 import net.zetetic.database.NoopTarget
@@ -60,7 +58,6 @@ abstract class RehabiAnexDatabase : RoomDatabase() {
             instance ?: buildEncryptedDatabase(
                 context = context.applicationContext,
                 databaseName = DATABASE_NAME,
-                isDebug = BuildConfig.DEBUG,
             ).also { instance = it }
         }
 
@@ -70,39 +67,20 @@ abstract class RehabiAnexDatabase : RoomDatabase() {
         ): RehabiAnexDatabase = buildEncryptedDatabase(
             context = context.applicationContext,
             databaseName = databaseName,
-            isDebug = true,
         )
 
         private fun buildEncryptedDatabase(
             context: Context,
             databaseName: String,
-            isDebug: Boolean,
         ): RehabiAnexDatabase {
             Logger.setTarget(NoopTarget())
             System.loadLibrary(SQLCIPHER_LIBRARY)
             val databaseFile = context.getDatabasePath(databaseName)
-            when (
-                legacyDatabaseAction(
-                    databaseExists = databaseFile.exists(),
-                    hasPlaintextHeader = databaseFile.hasPlaintextSqliteHeader(),
-                    isDebug = isDebug,
-                )
-            ) {
-                LegacyDatabaseAction.Continue -> Unit
-                LegacyDatabaseAction.DeletePlaintextDebugDatabase -> {
-                    deleteDebugPlaintextDatabase(context, databaseName)
-                }
-                LegacyDatabaseAction.RejectPlaintextReleaseDatabase -> {
-                    throw IllegalStateException(
-                        "La base local heredada no está cifrada; release requiere una migración explícita.",
-                    )
-                }
-            }
-
-            val databaseExistsAfterPolicy = context.getDatabasePath(databaseName).exists()
+            val databaseIsPlaintext = databaseFile.hasPlaintextSqliteHeader()
             val passphrase = DatabasePassphraseProvider(context).getOrCreate(
-                databaseAlreadyExists = databaseExistsAfterPolicy,
+                databaseAlreadyExists = databaseFile.exists() && !databaseIsPlaintext,
             )
+            PlaintextDatabaseMigrator(context, databaseName).migrateIfNeeded(passphrase)
             val factory = SupportOpenHelperFactory(passphrase.copyOf())
             passphrase.fill(0)
             return Room.databaseBuilder(
@@ -126,24 +104,7 @@ abstract class RehabiAnexDatabase : RoomDatabase() {
                 }
         }
 
-        private fun deleteDebugPlaintextDatabase(context: Context, databaseName: String) {
-            context.deleteDatabase(databaseName)
-            val databaseFile = context.getDatabasePath(databaseName)
-            listOf(
-                databaseFile,
-                File(databaseFile.path + "-wal"),
-                File(databaseFile.path + "-shm"),
-                File(databaseFile.path + "-journal"),
-            ).forEach { file ->
-                if (file.exists() && !file.delete()) {
-                    throw IllegalStateException(
-                        "No fue posible retirar la base local de pruebas sin cifrar.",
-                    )
-                }
-            }
-        }
-
-        private fun File.hasPlaintextSqliteHeader(): Boolean {
+        private fun java.io.File.hasPlaintextSqliteHeader(): Boolean {
             if (!isFile || length() < SQLITE_HEADER.size) return false
             val header = ByteArray(SQLITE_HEADER.size)
             return FileInputStream(this).use { input ->

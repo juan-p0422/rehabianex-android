@@ -1,7 +1,5 @@
 package com.example.rehabianex
 
-import com.example.rehabianex.data.local.db.LegacyDatabaseAction
-import com.example.rehabianex.data.local.db.legacyDatabaseAction
 import com.example.rehabianex.data.local.security.DatabaseKeyEnvelope
 import com.example.rehabianex.data.local.security.DatabaseKeyEnvelopeCodec
 import org.junit.Assert.assertArrayEquals
@@ -32,19 +30,4 @@ class DatabaseSecurityPolicyTest {
         }
     }
 
-    @Test
-    fun plaintextDatabaseIsDeletedOnlyInDebugAndRejectedInRelease() {
-        assertEquals(
-            LegacyDatabaseAction.DeletePlaintextDebugDatabase,
-            legacyDatabaseAction(true, true, true),
-        )
-        assertEquals(
-            LegacyDatabaseAction.RejectPlaintextReleaseDatabase,
-            legacyDatabaseAction(true, true, false),
-        )
-        assertEquals(
-            LegacyDatabaseAction.Continue,
-            legacyDatabaseAction(true, false, false),
-        )
-    }
 }

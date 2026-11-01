@@ -1,9 +1,9 @@
 package com.example.rehabianex
 
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.room.Room
 import com.example.rehabianex.core.session.OfflineDataCleanupCoordinator
 import com.example.rehabianex.data.local.PatientIdentityStore
 import com.example.rehabianex.data.local.SharedPreferencesPrivacyNoticeReadStore
@@ -74,12 +74,31 @@ class EncryptedRoomDatabaseInstrumentedTest {
     }
 
     @Test
-    fun plaintextDebugDatabaseIsReplacedByEncryptedDatabase() {
+    fun plaintextDatabaseIsMigratedWithoutLosingRows() = runBlocking {
         val file = context.getDatabasePath(TEST_DATABASE_NAME)
         file.parentFile?.mkdirs()
-        SQLiteDatabase.openOrCreateDatabase(file, null).use { plainDatabase ->
-            plainDatabase.execSQL("CREATE TABLE legacy_secret(value TEXT)")
-        }
+        val plaintextDatabase = Room.databaseBuilder(
+            context,
+            RehabiAnexDatabase::class.java,
+            TEST_DATABASE_NAME,
+        ).build()
+        plaintextDatabase.patientSummaryDao().upsert(
+            PatientSummaryEntity(
+                ownerUid = "legacy-patient",
+                fullName = "Dato sintético conservado",
+                sobrietyStartDate = "2026-10-01",
+                lastSyncedAt = 7L,
+            ),
+        )
+        val pending = CreatePatientNoteRequest(
+            mood = "neutral",
+            moodScore = 5,
+            anxietyLevel = 2,
+            cravingLevel = 1,
+            hadRelapse = false,
+        ).toPendingEntity("legacy-patient")
+        plaintextDatabase.patientNoteDao().upsert(pending)
+        plaintextDatabase.close()
         val plainHeader = ByteArray(SQLITE_HEADER.size)
         FileInputStream(file).use { it.read(plainHeader) }
         assertArrayEquals(SQLITE_HEADER, plainHeader)
@@ -92,6 +111,11 @@ class EncryptedRoomDatabaseInstrumentedTest {
         val encryptedHeader = ByteArray(SQLITE_HEADER.size)
         FileInputStream(file).use { it.read(encryptedHeader) }
         assertFalse(encryptedHeader.contentEquals(SQLITE_HEADER))
+        assertEquals(
+            "Dato sintético conservado",
+            database!!.patientSummaryDao().get("legacy-patient")?.fullName,
+        )
+        assertEquals(1, database!!.patientNoteDao().pendingCount("legacy-patient"))
     }
 
     @Test
