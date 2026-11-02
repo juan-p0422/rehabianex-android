@@ -164,7 +164,7 @@ class Stage7ChatPresentationInstrumentedTest {
         expected: String,
     ) = assert(
         SemanticsMatcher("EditableText text equals '$expected'") { node ->
-            node.config.getOrNull(SemanticsProperties.EditableText)?.text == expected
+            node.config[SemanticsProperties.EditableText].text == expected
         },
     )
 }
