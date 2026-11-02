@@ -98,19 +98,12 @@ internal class PlaintextDatabaseMigrator(
         try {
             val attachedKey = passphrase.copyOf()
             try {
-                database.beginTransaction()
-                try {
-                    database.execSQL(
-                        "ATTACH DATABASE ? AS encrypted KEY ?;",
-                        arrayOf(target.path, attachedKey),
-                    )
-                    database.compileStatement("SELECT sqlcipher_export('encrypted')").use {
-                        it.simpleQueryForString()
-                    }
-                    database.setTransactionSuccessful()
-                } finally {
-                    database.endTransaction()
-                }
+                database.execSQL(
+                    "ATTACH DATABASE ? AS encrypted KEY ?;",
+                    arrayOf(target.path, attachedKey),
+                )
+                database.rawExecSQL("SELECT sqlcipher_export('encrypted');")
+                database.execSQL("DETACH DATABASE encrypted;")
             } finally {
                 attachedKey.fill(0)
             }
