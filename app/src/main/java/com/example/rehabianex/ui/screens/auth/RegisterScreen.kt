@@ -348,7 +348,8 @@ fun RegisterScreen(
                     ),
                 )
             },
-            enabled = !isLoading && acceptedPrivacy,
+            enabled = !isLoading && acceptedPrivacy &&
+                (role != "patient" || acceptedSensitiveData),
         )
         Spacer(Modifier.height(12.dp))
     }

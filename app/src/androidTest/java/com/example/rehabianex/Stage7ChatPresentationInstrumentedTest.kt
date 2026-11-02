@@ -87,10 +87,14 @@ class Stage7ChatPresentationInstrumentedTest {
 
         val field = composeRule.onNodeWithText("Escribe tu pregunta con el contexto necesario")
         field.performClick()
-        executeShellCommandAndWait("input text Resume%s")
+        executeShellCommandAndWait("input text Resume")
+        executeShellCommandAndWait("input keyevent KEYCODE_SPACE")
         composeRule.waitForIdle()
         field.assertEditableTextEquals("Resume ")
-        executeShellCommandAndWait("input text mis%sregistros%sde%sesta%ssemana")
+        listOf("mis", "registros", "de", "esta", "semana").forEachIndexed { index, word ->
+            executeShellCommandAndWait("input text $word")
+            if (index < 4) executeShellCommandAndWait("input keyevent KEYCODE_SPACE")
+        }
         composeRule.waitForIdle()
         field.assertEditableTextEquals("Resume mis registros de esta semana")
         captureEvidence("supervisor-chat-spaces.png")

@@ -42,9 +42,7 @@ class SensitiveConsentPresentationInstrumentedTest {
         composeRule.onNodeWithText("Registrar").assertIsNotEnabled()
 
         composeRule.onNodeWithContentDescription("Aceptar Aviso de Privacidad").performClick()
-        // Privacy gates submission; the independent sensitive decision is
-        // validated on submit so its focused error can be shown.
-        composeRule.onNodeWithText("Registrar").assertIsEnabled()
+        composeRule.onNodeWithText("Registrar").assertIsNotEnabled()
         composeRule.onNodeWithContentDescription("Aceptar tratamiento de datos sensibles").performClick()
         composeRule.onNodeWithContentDescription("Aceptar Aviso de Privacidad").assertIsOn()
         composeRule.onNodeWithContentDescription("Aceptar tratamiento de datos sensibles").assertIsOn()

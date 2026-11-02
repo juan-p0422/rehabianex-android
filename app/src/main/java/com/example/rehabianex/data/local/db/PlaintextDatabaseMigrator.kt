@@ -75,10 +75,6 @@ internal class PlaintextDatabaseMigrator(
         passphrase: ByteArray,
         version: Int,
     ) {
-        val targetPath = target.path.replace("'", "''")
-        val keyHex = passphrase.joinToString(separator = "") { byte ->
-            "%02x".format(byte.toInt() and 0xff)
-        }
         val database = CipherSQLiteDatabase.openDatabase(
             source.path,
             ByteArray(0),
@@ -87,22 +83,15 @@ internal class PlaintextDatabaseMigrator(
             null,
         )
         try {
-            // A transaction pins ATTACH and sqlcipher_export to the same pooled
-            // connection. Without it, Android may execute the SELECT on a
-            // different connection where the attached schema does not exist.
-            database.beginTransaction()
-            try {
-                database.rawExecSQL("ATTACH DATABASE '$targetPath' AS encrypted KEY \"x'$keyHex'\"")
-                database.rawQuery(
-                    "SELECT sqlcipher_export('encrypted')",
-                    *emptyArray<Any>(),
-                ).use { cursor ->
-                    check(cursor.moveToFirst()) { "La exportación cifrada no produjo resultado." }
-                }
-                database.setTransactionSuccessful()
-            } finally {
-                database.endTransaction()
-            }
+            // SQLCipher's supported import sequence keeps ATTACH/export on the
+            // native database handle. Binding the passphrase as a BLOB preserves
+            // the same raw bytes later supplied to Room's open-helper factory.
+            database.execSQL(
+                "ATTACH DATABASE ? AS encrypted KEY ?;",
+                arrayOf(target.path, passphrase.copyOf()),
+            )
+            database.rawExecSQL("SELECT sqlcipher_export('encrypted');")
+            database.execSQL("DETACH DATABASE encrypted;")
         } finally {
             database.close()
         }
