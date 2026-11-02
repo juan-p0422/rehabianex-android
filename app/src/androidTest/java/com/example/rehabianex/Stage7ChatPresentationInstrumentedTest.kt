@@ -13,7 +13,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.text.AnnotatedString
 import androidx.test.platform.app.InstrumentationRegistry
 import com.example.rehabianex.core.validation.preserveAiChatDraft
 import com.example.rehabianex.data.model.SupervisorChatData
@@ -164,9 +163,8 @@ class Stage7ChatPresentationInstrumentedTest {
     private fun androidx.compose.ui.test.SemanticsNodeInteraction.assertEditableTextEquals(
         expected: String,
     ) = assert(
-        SemanticsMatcher.expectValue(
-            SemanticsProperties.EditableText,
-            AnnotatedString(expected),
-        ),
+        SemanticsMatcher("EditableText text equals '$expected'") { node ->
+            node.config.getOrNull(SemanticsProperties.EditableText)?.text == expected
+        },
     )
 }
