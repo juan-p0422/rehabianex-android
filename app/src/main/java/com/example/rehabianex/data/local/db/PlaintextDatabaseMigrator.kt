@@ -75,6 +75,19 @@ internal class PlaintextDatabaseMigrator(
         passphrase: ByteArray,
         version: Int,
     ) {
+        val creationKey = passphrase.copyOf()
+        try {
+            CipherSQLiteDatabase.openDatabase(
+                target.path,
+                creationKey,
+                null,
+                CipherSQLiteDatabase.OPEN_READWRITE or CipherSQLiteDatabase.CREATE_IF_NECESSARY,
+                null,
+            ).close()
+        } finally {
+            creationKey.fill(0)
+        }
+
         val database = CipherSQLiteDatabase.openDatabase(
             source.path,
             ByteArray(0),
@@ -83,26 +96,34 @@ internal class PlaintextDatabaseMigrator(
             null,
         )
         try {
-            // SQLCipher's supported import sequence keeps ATTACH/export on the
-            // native database handle. Binding the passphrase as a BLOB preserves
-            // the same raw bytes later supplied to Room's open-helper factory.
-            database.execSQL(
-                "ATTACH DATABASE ? AS encrypted KEY ?;",
-                arrayOf(target.path, passphrase.copyOf()),
-            )
-            database.rawExecSQL("SELECT sqlcipher_export('encrypted');")
-            database.execSQL("DETACH DATABASE encrypted;")
+            val attachedKey = passphrase.copyOf()
+            try {
+                database.execSQL(
+                    "ATTACH DATABASE ? AS encrypted KEY ?;",
+                    arrayOf(target.path, attachedKey),
+                )
+                database.rawExecSQL("SELECT sqlcipher_export('encrypted');")
+                database.execSQL("DETACH DATABASE encrypted;")
+            } finally {
+                attachedKey.fill(0)
+            }
         } finally {
             database.close()
         }
-        CipherSQLiteDatabase.openDatabase(
-            target.path,
-            passphrase.copyOf(),
-            null,
-            CipherSQLiteDatabase.OPEN_READWRITE,
-            null,
-        ).use { encrypted ->
-            encrypted.rawExecSQL("PRAGMA user_version = $version")
+
+        val validationKey = passphrase.copyOf()
+        try {
+            CipherSQLiteDatabase.openDatabase(
+                target.path,
+                validationKey,
+                null,
+                CipherSQLiteDatabase.OPEN_READWRITE,
+                null,
+            ).use { encrypted ->
+                encrypted.version = version
+            }
+        } finally {
+            validationKey.fill(0)
         }
     }
 

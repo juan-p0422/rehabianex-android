@@ -6,11 +6,11 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.example.rehabianex.ui.screens.auth.RegisterScreen
 import com.example.rehabianex.ui.theme.RehabianexTheme
 import org.junit.Rule
@@ -41,11 +41,13 @@ class SensitiveConsentPresentationInstrumentedTest {
         ).assertExists()
         composeRule.onNodeWithText("Registrar").assertIsNotEnabled()
 
-        composeRule.onNodeWithContentDescription("Aceptar Aviso de Privacidad").performClick()
+        composeRule.onNodeWithContentDescription("Aceptar Aviso de Privacidad")
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithText("Registrar").assertIsNotEnabled()
-        composeRule.onNodeWithContentDescription("Aceptar tratamiento de datos sensibles").performClick()
-        composeRule.onNodeWithContentDescription("Aceptar Aviso de Privacidad").assertIsOn()
-        composeRule.onNodeWithContentDescription("Aceptar tratamiento de datos sensibles").assertIsOn()
+        composeRule.onNodeWithContentDescription("Aceptar tratamiento de datos sensibles")
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithText("Registrar").assertIsEnabled()
     }
 

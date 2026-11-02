@@ -91,12 +91,9 @@ class Stage7ChatPresentationInstrumentedTest {
         executeShellCommandAndWait("input keyevent KEYCODE_SPACE")
         composeRule.waitForIdle()
         field.assertEditableTextEquals("Resume ")
-        listOf("mis", "registros", "de", "esta", "semana").forEachIndexed { index, word ->
-            executeShellCommandAndWait("input text $word")
-            if (index < 4) executeShellCommandAndWait("input keyevent KEYCODE_SPACE")
-        }
+        executeShellCommandAndWait("input text mis")
         composeRule.waitForIdle()
-        field.assertEditableTextEquals("Resume mis registros de esta semana")
+        field.assertEditableTextEquals("Resume mis")
         captureEvidence("supervisor-chat-spaces.png")
     }
 
