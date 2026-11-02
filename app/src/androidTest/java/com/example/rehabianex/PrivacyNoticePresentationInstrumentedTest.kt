@@ -100,6 +100,39 @@ class PrivacyNoticePresentationInstrumentedTest {
     }
 
     @Test
+    fun preRegistrationNoticeOffersRegistrationOnlyAfterShowingContent() {
+        var continuations = 0
+        composeRule.setContent {
+            RehabianexTheme {
+                PrivacyNoticeScreen(
+                    uiState = PrivacyNoticeUiState.Content(
+                        notice = PrivacyNoticeDto(
+                            version = "2026-10-30",
+                            publishedOn = "2026-10-30",
+                            content = "Aviso visible antes de solicitar datos personales.",
+                        ),
+                    ),
+                    confirmationRequired = false,
+                    onConfirm = {},
+                    onRetry = {},
+                    onBack = {},
+                    onLogout = {},
+                    primaryActionLabel = "Continuar al registro",
+                    onPrimaryAction = { continuations += 1 },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("Aviso visible antes de solicitar datos personales.")
+            .assertExists()
+        composeRule.onNodeWithText("Continuar al registro")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .performClick()
+        assertEquals(1, continuations)
+    }
+
+    @Test
     fun currentNoticeKeepsDeletionAndProtectionLimitsWithoutExportPromise() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val content = context.assets.open("legal/privacy-notice-2026-10-30.md")

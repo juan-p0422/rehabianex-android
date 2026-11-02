@@ -19,6 +19,7 @@ class AdminNavigationTest {
         assertTrue(shouldRedirectToPrivacyGate(true, false, Routes.AdminHome))
         assertFalse(shouldRedirectToPrivacyGate(true, false, Routes.PrivacyGate))
         assertFalse(shouldRedirectToPrivacyGate(true, false, Routes.PrivacyNotice))
+        assertFalse(shouldRedirectToPrivacyGate(true, false, Routes.PrivacyBeforeRegister))
         assertFalse(shouldRedirectToPrivacyGate(true, true, Routes.PatientHome))
         assertFalse(shouldRedirectToPrivacyGate(false, false, Routes.Register))
     }

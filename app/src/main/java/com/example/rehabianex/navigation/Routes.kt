@@ -6,6 +6,7 @@ object Routes {
     const val Splash = "splash"
     const val Login = "login"
     const val Register = "register"
+    const val PrivacyBeforeRegister = "privacy_before_register"
     const val Consent = "consent"
     const val PrivacyGate = "privacy_gate"
     const val PrivacyNotice = "privacy_notice"

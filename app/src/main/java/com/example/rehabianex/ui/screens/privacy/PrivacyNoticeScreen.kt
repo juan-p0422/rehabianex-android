@@ -39,6 +39,8 @@ fun PrivacyNoticeScreen(
     onRetry: () -> Unit,
     onBack: () -> Unit,
     onLogout: () -> Unit,
+    primaryActionLabel: String? = null,
+    onPrimaryAction: () -> Unit = {},
 ) {
     var checked by rememberSaveable { mutableStateOf(false) }
 
@@ -121,6 +123,10 @@ fun PrivacyNoticeScreen(
                         onClick = onLogout,
                     )
                 } else {
+                    primaryActionLabel?.let { label ->
+                        RehabianexButton(label, onClick = onPrimaryAction)
+                        Spacer(Modifier.height(8.dp))
+                    }
                     RehabianexOutlineButton("Volver", onClick = onBack)
                 }
                 Spacer(Modifier.height(16.dp))

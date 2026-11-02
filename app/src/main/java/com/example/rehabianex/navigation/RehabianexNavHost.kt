@@ -187,11 +187,34 @@ fun RehabianexNavHost(
                     )
                 },
                 onRegisterClick = {
-                    navController.navigate(Routes.Register)
+                    navController.navigate(Routes.PrivacyBeforeRegister)
                 },
                 uiState = uiState,
                 onInputChanged = authViewModel::clearState,
                 infoMessage = authInfoMessage,
+            )
+        }
+        composable(Routes.PrivacyBeforeRegister) {
+            val privacyViewModel: PrivacyNoticeViewModel = viewModel(
+                factory = PrivacyNoticeViewModel.Factory(
+                    repository = privacyNoticeRepository,
+                    confirmationRequired = false,
+                ),
+            )
+            val privacyState by privacyViewModel.uiState.collectAsStateWithLifecycle()
+            PrivacyNoticeScreen(
+                uiState = privacyState,
+                confirmationRequired = false,
+                onConfirm = {},
+                onRetry = privacyViewModel::load,
+                onBack = { navController.popBackStack() },
+                onLogout = logout,
+                primaryActionLabel = "Continuar al registro",
+                onPrimaryAction = {
+                    navController.navigate(Routes.Register) {
+                        popUpTo(Routes.PrivacyBeforeRegister) { inclusive = true }
+                    }
+                },
             )
         }
         composable(Routes.Register) {
@@ -545,6 +568,7 @@ private val SAFE_PATIENT_DETAIL_ROUTE = Regex(
 private val PRIVACY_GATE_PUBLIC_ROUTES = setOf(
     Routes.Splash,
     Routes.Login,
+    Routes.PrivacyBeforeRegister,
     Routes.Register,
     Routes.PrivacyGate,
     Routes.PrivacyNotice,
