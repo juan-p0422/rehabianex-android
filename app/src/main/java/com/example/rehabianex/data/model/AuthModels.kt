@@ -30,7 +30,7 @@ data class RegisterRequest(
     val sensitiveDataConsentVersion: String? = null,
 )
 
-const val PRIVACY_NOTICE_VERSION = "2026-10-30"
+const val PRIVACY_NOTICE_VERSION = "2026-11-03"
 const val SENSITIVE_DATA_CONSENT_VERSION = "2026-10-27"
 
 data class RefreshRequest(

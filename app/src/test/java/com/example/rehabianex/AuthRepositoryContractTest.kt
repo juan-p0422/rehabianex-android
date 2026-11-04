@@ -101,7 +101,7 @@ class AuthRepositoryContractTest {
                         uid = "confirmed-user",
                         role = "patient",
                         privacyNoticeRead = PrivacyNoticeReadDto(
-                            privacyNoticeVersion = "2026-10-30",
+                            privacyNoticeVersion = "2026-11-03",
                             status = "confirmed",
                             isCurrent = true,
                         ),
@@ -117,7 +117,7 @@ class AuthRepositoryContractTest {
         assertTrue(result is AuthResult.Success)
         val session = (result as AuthResult.Success).session
         assertTrue(session.privacyNoticeStatusChecked)
-        assertEquals("2026-10-30", session.privacyNoticeConfirmedVersion)
+        assertEquals("2026-11-03", session.privacyNoticeConfirmedVersion)
     }
 
     @Test
@@ -294,7 +294,7 @@ class AuthRepositoryContractTest {
                 gender = "female",
                 age = 29,
                 privacyNoticeAccepted = true,
-                privacyNoticeVersion = "2026-10-30",
+                privacyNoticeVersion = "2026-11-03",
             ),
         ) as AuthResult.Failure
 
@@ -696,7 +696,7 @@ class AuthRepositoryContractTest {
         role = "patient",
         phone = "+524490000000",
         privacyNoticeAccepted = true,
-        privacyNoticeVersion = "2026-10-30",
+        privacyNoticeVersion = "2026-11-03",
         sensitiveDataConsentAccepted = true,
         sensitiveDataConsentVersion = "2026-10-27",
     )

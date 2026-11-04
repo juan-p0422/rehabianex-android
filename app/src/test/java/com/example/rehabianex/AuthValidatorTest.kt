@@ -59,7 +59,7 @@ class AuthValidatorTest {
         assertEquals(29, result.value?.age)
         assertEquals(null, result.value?.supervisorType)
         assertTrue(result.value?.privacyNoticeAccepted == true)
-        assertEquals("2026-10-30", result.value?.privacyNoticeVersion)
+        assertEquals("2026-11-03", result.value?.privacyNoticeVersion)
         assertTrue(result.value?.sensitiveDataConsentAccepted == true)
         assertEquals("2026-10-27", result.value?.sensitiveDataConsentVersion)
     }

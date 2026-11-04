@@ -41,8 +41,8 @@ class PrivacyNoticePresentationInstrumentedTest {
                     uiState = PrivacyNoticeUiState.Content(
                         notice = PrivacyNoticeDto(
                             title = "Aviso de Privacidad de RehabiAnex",
-                            version = "2026-10-30",
-                            publishedOn = "2026-10-30",
+                            version = "2026-11-03",
+                            publishedOn = "2026-11-03",
                             content = "Contenido completo sintético para la prueba.",
                         ),
                     ),
@@ -79,8 +79,8 @@ class PrivacyNoticePresentationInstrumentedTest {
                 PrivacyNoticeScreen(
                     uiState = PrivacyNoticeUiState.Content(
                         notice = PrivacyNoticeDto(
-                            version = "2026-10-30",
-                            publishedOn = "2026-10-30",
+                            version = "2026-11-03",
+                            publishedOn = "2026-11-03",
                             content = "Aviso visible en perfil.",
                         ),
                     ),
@@ -107,8 +107,8 @@ class PrivacyNoticePresentationInstrumentedTest {
                 PrivacyNoticeScreen(
                     uiState = PrivacyNoticeUiState.Content(
                         notice = PrivacyNoticeDto(
-                            version = "2026-10-30",
-                            publishedOn = "2026-10-30",
+                            version = "2026-11-03",
+                            publishedOn = "2026-11-03",
                             content = "Aviso visible antes de solicitar datos personales.",
                         ),
                     ),
@@ -135,12 +135,15 @@ class PrivacyNoticePresentationInstrumentedTest {
     @Test
     fun currentNoticeKeepsDeletionAndProtectionLimitsWithoutExportPromise() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val content = context.assets.open("legal/privacy-notice-2026-10-30.md")
+        val content = context.assets.open("legal/privacy-notice-2026-11-03.md")
             .bufferedReader()
             .use { it.readText() }
 
-        assertTrue(content.contains("Versión 2026-10-30"))
+        assertTrue(content.contains("Versión 2026-11-03"))
         assertTrue(content.contains("rehabianex@gmail.com"))
+        assertTrue(content.contains("Calle Circuito Loma Norte número 8962"))
+        assertTrue(content.contains("C.P. 45402"))
+        assertTrue(content.contains("no atribuye al CETI la responsabilidad del tratamiento"))
         assertTrue(content.contains("Desactivar mi cuenta y solicitar eliminación"))
         assertTrue(content.contains("Solicitar eliminación definitiva"))
         assertTrue(content.contains("HTTPS/TLS"))
@@ -155,7 +158,7 @@ class PrivacyNoticePresentationInstrumentedTest {
     @Test
     fun currentNoticeRemainsScrollableAtOneHundredFiftyPercentText() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val content = context.assets.open("legal/privacy-notice-2026-10-30.md")
+        val content = context.assets.open("legal/privacy-notice-2026-11-03.md")
             .bufferedReader()
             .use { it.readText() }
 
@@ -168,8 +171,8 @@ class PrivacyNoticePresentationInstrumentedTest {
                     PrivacyNoticeScreen(
                         uiState = PrivacyNoticeUiState.Content(
                             notice = PrivacyNoticeDto(
-                                version = "2026-10-30",
-                                publishedOn = "2026-10-30",
+                                version = "2026-11-03",
+                                publishedOn = "2026-11-03",
                                 content = content,
                             ),
                         ),
@@ -186,7 +189,7 @@ class PrivacyNoticePresentationInstrumentedTest {
         composeRule.onNodeWithText("Límites de RehabiAnex")
             .performScrollTo()
             .assertIsDisplayed()
-        captureEvidence("privacy-2026-10-30-font-150.png")
+        captureEvidence("privacy-2026-11-03-font-150.png")
     }
 
     private fun captureEvidence(name: String) {

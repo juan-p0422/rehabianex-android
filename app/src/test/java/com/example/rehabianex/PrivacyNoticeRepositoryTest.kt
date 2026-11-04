@@ -548,7 +548,7 @@ class PrivacyNoticeRepositoryTest {
     }
 
     private companion object {
-        const val CURRENT_VERSION = "2026-10-30"
+        const val CURRENT_VERSION = "2026-11-03"
         const val OWNER_A = "synthetic-owner-a"
         const val OWNER_B = "synthetic-owner-b"
     }

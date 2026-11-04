@@ -236,10 +236,10 @@ class PrivacyNoticeRepository(
         return PrivacyNoticeDto(
             title = "Aviso de Privacidad de RehabiAnex",
             version = PRIVACY_NOTICE_VERSION,
-            publishedOn = "2026-10-30",
+            publishedOn = "2026-11-03",
             content = content,
-            responsibleStatus = "pending_confirmation",
-            contactStatus = "pending_confirmation",
+            responsibleStatus = "identified",
+            contactStatus = "phone_and_email_confirmed",
             sensitiveDataConsentSeparate = true,
         )
     }

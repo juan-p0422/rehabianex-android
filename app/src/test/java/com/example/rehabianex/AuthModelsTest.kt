@@ -137,7 +137,7 @@ class AuthModelsTest {
                 gender = "female",
                 age = 29,
                 privacyNoticeAccepted = true,
-                privacyNoticeVersion = "2026-10-30",
+                privacyNoticeVersion = "2026-11-03",
                 sensitiveDataConsentAccepted = true,
                 sensitiveDataConsentVersion = "2026-10-27",
             ),
@@ -146,7 +146,7 @@ class AuthModelsTest {
         assertTrue(json.contains("\"full_name\":\"Paciente Prueba\""))
         assertTrue(json.contains("\"gender\":\"female\""))
         assertTrue(json.contains("\"privacy_notice_accepted\":true"))
-        assertTrue(json.contains("\"privacy_notice_version\":\"2026-10-30\""))
+        assertTrue(json.contains("\"privacy_notice_version\":\"2026-11-03\""))
         assertTrue(json.contains("\"sensitive_data_consent_accepted\":true"))
         assertTrue(json.contains("\"sensitive_data_consent_version\":\"2026-10-27\""))
         assertFalse(json.contains("supervisor_type"))
