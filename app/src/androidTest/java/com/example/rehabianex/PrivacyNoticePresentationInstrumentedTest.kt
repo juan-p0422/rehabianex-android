@@ -141,9 +141,8 @@ class PrivacyNoticePresentationInstrumentedTest {
 
         assertTrue(content.contains("Versión 2026-11-03"))
         assertTrue(content.contains("rehabianex@gmail.com"))
-        assertTrue(content.contains("Calle Circuito Loma Norte número 8962"))
-        assertTrue(content.contains("C.P. 45402"))
-        assertTrue(content.contains("no atribuye al CETI la responsabilidad del tratamiento"))
+        assertTrue(content.contains("No se ha proporcionado un domicilio aplicable"))
+        assertTrue(content.contains("No se utiliza el domicilio del CETI"))
         assertTrue(content.contains("Desactivar mi cuenta y solicitar eliminación"))
         assertTrue(content.contains("Solicitar eliminación definitiva"))
         assertTrue(content.contains("HTTPS/TLS"))
