@@ -68,7 +68,7 @@ class FcmTokenManager(
         cancelScheduledRegistration()
         return try {
             tokenMutationMutex.withLock {
-                val messaging = FirebaseMessaging.getInstance()
+                val messaging = firebaseMessagingOrNull()
                 val token = sessionManager.getFcmToken()?.validFcmTokenOrNull()
                 val remoteRevoked = token?.let { safeToken ->
                     try {
@@ -84,7 +84,7 @@ class FcmTokenManager(
 
                 // Impide que la instalación reutilice el token del usuario anterior.
                 try {
-                    messaging.deleteToken().awaitCompletion()
+                    messaging?.deleteToken()?.awaitCompletion()
                 } catch (error: CancellationException) {
                     throw error
                 } catch (_: Exception) {
@@ -113,7 +113,8 @@ class FcmTokenManager(
                 for (delayMillis in delays) {
                     if (delayMillis > 0L) delay(delayMillis)
                     if (!registrationIsAllowed(owner)) return@launch
-                    val token = tokenOrNull(FirebaseMessaging.getInstance()) ?: continue
+                    val messaging = firebaseMessagingOrNull() ?: return@launch
+                    val token = tokenOrNull(messaging) ?: continue
                     if (registerTokenOnce(token, owner)) return@launch
                 }
             }
@@ -190,6 +191,11 @@ class FcmTokenManager(
     private fun firebaseIsConfigured(): Boolean =
         FirebaseApp.getApps(applicationContext).isNotEmpty()
 
+    private fun firebaseMessagingOrNull(): FirebaseMessaging? =
+        configuredFirebaseServiceOrNull(firebaseIsConfigured()) {
+            FirebaseMessaging.getInstance()
+        }
+
     private fun String.validFcmTokenOrNull(): String? = trim()
         .takeIf { it.isNotEmpty() && it.length <= MAX_FCM_TOKEN_LENGTH && it.none(Char::isWhitespace) }
 
@@ -241,6 +247,18 @@ class FcmTokenManager(
 
         const val MAX_FCM_TOKEN_LENGTH = 16_384
         const val DEFAULT_LOCALE = "es-MX"
+    }
+}
+
+internal inline fun <T> configuredFirebaseServiceOrNull(
+    isConfigured: Boolean,
+    serviceProvider: () -> T,
+): T? {
+    if (!isConfigured) return null
+    return try {
+        serviceProvider()
+    } catch (_: IllegalStateException) {
+        null
     }
 }
 

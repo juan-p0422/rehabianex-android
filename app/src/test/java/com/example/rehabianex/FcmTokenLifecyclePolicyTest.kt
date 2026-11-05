@@ -2,6 +2,7 @@ package com.example.rehabianex
 
 import com.example.rehabianex.notifications.FCM_REGISTRATION_RETRY_DELAYS_MILLIS
 import com.example.rehabianex.notifications.FcmTokenLifecycleState
+import com.example.rehabianex.notifications.configuredFirebaseServiceOrNull
 import com.example.rehabianex.notifications.fcmSessionOwnerOrNull
 import com.example.rehabianex.notifications.shouldRegisterFcmToken
 import org.junit.Assert.assertEquals
@@ -88,6 +89,28 @@ class FcmTokenLifecyclePolicyTest {
             listOf(1_000L, 5_000L, 15_000L, 60_000L),
             FCM_REGISTRATION_RETRY_DELAYS_MILLIS,
         )
+    }
+
+    @Test
+    fun missingFirebaseApp_doesNotRequestMessagingServiceOrCrashSession() {
+        var providerCalled = false
+
+        val service = configuredFirebaseServiceOrNull(isConfigured = false) {
+            providerCalled = true
+            error("FirebaseMessaging must not be requested without FirebaseApp")
+        }
+
+        assertNull(service)
+        assertFalse(providerCalled)
+    }
+
+    @Test
+    fun unavailableFirebaseMessaging_isHandledAsOptionalService() {
+        val service = configuredFirebaseServiceOrNull<String>(isConfigured = true) {
+            throw IllegalStateException("Default FirebaseApp is not initialized")
+        }
+
+        assertNull(service)
     }
 
     private fun state(
